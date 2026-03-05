@@ -1,0 +1,148 @@
+{
+  "projectType": "data-platform",
+  "projectName": "NominaSoft",
+  "projectDescription": "PostgreSQL-based payroll management system with Colombian labor law compliance for calculating employee wages, deductions, and benefits.",
+  "theme": "sequoia",
+  "primaryColor": "#1E40AF",
+  "lightColor": "#3B82F6",
+  "darkColor": "#1E3A8A",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Database Schema",
+            "pages": [
+              "schema/overview",
+              "schema/users",
+              "schema/conceptos",
+              "schema/cargos",
+              "schema/meses",
+              "schema/pmtros",
+              "schema/emplea",
+              "schema/novedades",
+              "schema/nomina",
+              "schema/error"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/payroll-calculation",
+              "guides/employee-management",
+              "guides/concepts-configuration",
+              "guides/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Function Reference",
+        "groups": [
+          {
+            "group": "Payroll Processing",
+            "pages": [
+              "functions/payroll/fun_act_nomina"
+            ]
+          },
+          {
+            "group": "Employee Functions",
+            "pages": [
+              "functions/emplea/fun_insert_emplea",
+              "functions/emplea/fun_update_emplea",
+              "functions/emplea/fun_delete_emplea",
+              "functions/emplea/fun_listar_emplea"
+            ]
+          },
+          {
+            "group": "Position Functions",
+            "pages": [
+              "functions/cargos/fun_insert_cargos",
+              "functions/cargos/fun_update_cargos",
+              "functions/cargos/fun_delete_cargos"
+            ]
+          },
+          {
+            "group": "Concept Functions",
+            "pages": [
+              "functions/conceptos/fun_insert_conceptos",
+              "functions/conceptos/fun_update_conceptos",
+              "functions/conceptos/fun_delete_conceptos"
+            ]
+          },
+          {
+            "group": "Month Functions",
+            "pages": [
+              "functions/meses/fun_insert_meses",
+              "functions/meses/fun_update_meses",
+              "functions/meses/fun_delete_meses"
+            ]
+          },
+          {
+            "group": "Parameter Functions",
+            "pages": [
+              "functions/pmtros/fun_insert_pmtros",
+              "functions/pmtros/fun_update_pmtros",
+              "functions/pmtros/fun_delete_pmtros"
+            ]
+          },
+          {
+            "group": "Novelty Functions",
+            "pages": [
+              "functions/novedades/fun_insert_novedades",
+              "functions/novedades/fun_update_novedades",
+              "functions/novedades/fun_delete_novedades"
+            ]
+          },
+          {
+            "group": "Payroll Record Functions",
+            "pages": [
+              "functions/nomina/fun_delete_nomina"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Colombian payroll compliance with legal concepts (EPS, AFP, transport subsidy)",
+    "Flexible payment periods (biweekly/quincenal or monthly/mensual)",
+    "Automated payroll calculation with earnings and deductions",
+    "Employee management with comprehensive personal and work information",
+    "Overtime and bonus tracking through novelties system",
+    "Robust error handling with PostgreSQL SQLSTATE codes",
+    "Transport subsidy calculation based on minimum wage multiples",
+    "Configurable payroll concepts (mandatory and optional)"
+  ],
+  "publicApiSurface": [
+    "fun_act_nomina(ano, mes, periodo)",
+    "fun_insert_emplea(...)",
+    "fun_update_emplea(...)",
+    "fun_delete_emplea(id)",
+    "fun_listar_emplea()",
+    "fun_insert_cargos(nombre)",
+    "fun_update_cargos(id, nombre)",
+    "fun_delete_cargos(id)",
+    "fun_insert_conceptos(...)",
+    "fun_update_conceptos(...)",
+    "fun_delete_conceptos(id)",
+    "fun_insert_meses(nombre)",
+    "fun_update_meses(id, nombre)",
+    "fun_delete_meses(id)",
+    "fun_insert_pmtros(...)",
+    "fun_update_pmtros(...)",
+    "fun_delete_pmtros(id)",
+    "fun_insert_novedades(...)",
+    "fun_update_novedades(...)",
+    "fun_delete_novedades(ano, mes, periodo)",
+    "fun_delete_nomina(ano, mes, periodo)"
+  ]
+}
