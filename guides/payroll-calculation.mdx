@@ -1,0 +1,286 @@
+---
+title: "Payroll Calculation Guide"
+description: "Complete guide to understanding and executing payroll calculations in NominaSoft"
+---
+
+## Overview
+
+The payroll calculation process in NominaSoft is handled by the `fun_act_nomina()` function, which calculates employee compensation including earnings (devengados), deductions (deducidos), and the final net payment for a specific period.
+
+## Core Calculation Function
+
+The payroll calculation is executed using:
+
+```sql
+SELECT fun_act_nomina(year, month, period);
+```
+
+### Parameters
+
+- **year** (`ano_nomina`): The year for which to calculate payroll (e.g., 2025)
+- **month** (`mes_nomina`): The month number (1-12)
+- **period** (`per_nomina`): Payment period indicator
+  - `1` = First period (quincenal/biweekly)
+  - `2` = Second period
+
+<Note>
+The year, month, and period must match the values configured in `tab_pmtros` (parameters table), otherwise the function will raise error `22008`.
+</Note>
+
+## Payment Period Logic
+
+The system supports two payment frequencies configured in `tab_pmtros.ind_perio_pago`:
+
+- **`Q` (Quincenal)**: Biweekly payment - employees are paid twice per month
+- **`M` (Mensual)**: Monthly payment - employees are paid once per month
+
+### Days Calculation
+
+```sql
+IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+    wval_dias = wreg_pmtros.num_diasmes / 2;  -- 15 days for biweekly
+ELSE
+    wval_dias = wreg_pmtros.num_diasmes;      -- 30 days for monthly
+END IF;
+```
+
+## Earnings (Devengados)
+
+Earnings are concepts where `ind_operacion = TRUE`. The system calculates two mandatory earnings:
+
+### 1. Basic Salary (Salario Básico)
+
+Identified by `tab_pmtros.id_concep_sb`, the basic salary is prorated based on the payment period:
+
+```sql
+-- For biweekly payment
+IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+    wval_salario = wreg_emplea.val_sal_basico / 2;
+ELSE
+    wval_salario = wreg_emplea.val_sal_basico;
+END IF;
+
+-- Calculate salary based on days worked
+wsum_devengado = wsum_devengado + ((wval_salario / wreg_pmtros.num_diasmes) * wval_dias);
+```
+
+<Steps>
+  <Step title="Determine payment period">
+    Check if payment is quincenal (Q) or mensual (M)
+  </Step>
+  <Step title="Calculate period salary">
+    Divide annual salary by 2 for biweekly, or use full salary for monthly
+  </Step>
+  <Step title="Prorate for days worked">
+    Formula: `(period_salary / fiscal_month_days) * days_worked`
+  </Step>
+</Steps>
+
+### 2. Transportation Subsidy (Auxilio de Transporte)
+
+Identified by `tab_pmtros.id_concep_at`, this subsidy is only paid to employees whose basic salary is at or below a threshold:
+
+```sql
+-- Eligibility check
+IF wreg_emplea.val_sal_basico <= (wreg_pmtros.val_smlv * wreg_pmtros.ind_num_trans) THEN
+    -- Employee qualifies for transportation subsidy
+    IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+        wval_trans = wreg_pmtros.val_auxtrans / 2;  -- Half for biweekly
+    ELSE
+        wval_trans = wreg_pmtros.val_auxtrans;      -- Full for monthly
+    END IF;
+    
+    wsum_devengado = wsum_devengado + wval_trans;
+END IF;
+```
+
+<Warning>
+The transportation subsidy is **only** applied when:
+- Employee's basic salary ≤ (SMLV × `ind_num_trans`)
+- Default threshold: 2 × minimum wage (`ind_num_trans = 2`)
+</Warning>
+
+### Optional Earnings (Non-Mandatory)
+
+Optional earnings have `ind_legal = FALSE` and can include:
+
+- **Bonuses** (`val_fijo`): Fixed amount bonuses (e.g., 100,000 for special achievements)
+- **Overtime** (`val_porcent`): Percentage-based calculations
+  - Daytime overtime: 25% of hourly rate
+  - Nighttime overtime: 75% of hourly rate
+  - Holiday daytime: 100% of hourly rate
+  - Holiday nighttime: 150% of hourly rate
+
+## Deductions (Deducidos)
+
+Deductions are concepts where `ind_operacion = FALSE`. The system calculates mandatory deductions:
+
+### Percentage-Based Deductions
+
+```sql
+IF wreg_concep.val_porcent <> 0 THEN
+    -- Calculate percentage of base salary
+    wval_concepto = (wreg_emplea.val_sal_basico * wreg_concep.val_porcent) / 100;
+    
+    -- Adjust for payment period
+    IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+        wval_concepto = wval_concepto / 2;
+    END IF;
+    
+    wsum_deducido = wsum_deducido + wval_concepto;
+END IF;
+```
+
+### Mandatory Deductions
+
+<Accordion title="EPS (Health Insurance) - 4%">
+  **Concept ID**: 3  
+  **Type**: Percentage-based deduction  
+  **Rate**: 4% of basic salary  
+  **Period**: Monthly (`ind_perio_pago = 'M'`)
+  
+  Example for employee earning $8,000,000/month:
+  - Monthly deduction: $320,000
+  - Biweekly deduction: $160,000 (if system configured as quincenal)
+</Accordion>
+
+<Accordion title="AFP (Pension Fund) - 4%">
+  **Concept ID**: 4  
+  **Type**: Percentage-based deduction  
+  **Rate**: 4% of basic salary  
+  **Period**: Monthly (`ind_perio_pago = 'M'`)
+  
+  Example for employee earning $8,000,000/month:
+  - Monthly deduction: $320,000
+  - Biweekly deduction: $160,000 (if system configured as quincenal)
+</Accordion>
+
+### Fixed-Value Deductions
+
+```sql
+IF wreg_concep.val_fijo <> 0 THEN
+    wval_concepto = (wreg_emplea.val_sal_basico + wreg_concep.val_fijo);
+    
+    IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+        wval_concepto = wval_concepto / 2;
+    END IF;
+    
+    wsum_deducido = wsum_deducido + wval_concepto;
+END IF;
+```
+
+## Calculation Process Flow
+
+<Steps>
+  <Step title="Load parameters">
+    Retrieve company parameters from `tab_pmtros` including SMLV, transportation subsidy, and payment period configuration
+  </Step>
+  
+  <Step title="Validate inputs">
+    Verify that year, month, and period match the configured parameters. Raises `22008` error if mismatch.
+  </Step>
+  
+  <Step title="Clear previous calculations">
+    Delete existing payroll records for the specified period to ensure clean recalculation:
+    ```sql
+    DELETE FROM tab_nomina
+    WHERE ano_nomina = wano_nomina AND
+          mes_nomina = wmes_nomina AND
+          per_nomina = wper_nomina;
+    ```
+  </Step>
+  
+  <Step title="Iterate through employees">
+    Open cursor to process each employee in `tab_emplea`
+  </Step>
+  
+  <Step title="Calculate mandatory earnings">
+    For each employee:
+    - Calculate basic salary (prorated for period)
+    - Determine transportation subsidy eligibility
+    - Add to total earnings (`wsum_devengado`)
+  </Step>
+  
+  <Step title="Calculate mandatory deductions">
+    For each employee:
+    - Calculate EPS (4% health insurance)
+    - Calculate AFP (4% pension)
+    - Add to total deductions (`wsum_deducido`)
+  </Step>
+  
+  <Step title="Insert payroll records">
+    For each concept, insert a record into `tab_nomina`:
+    ```sql
+    INSERT INTO tab_nomina VALUES(
+        wano_nomina,      -- Year
+        wmes_nomina,      -- Month
+        wper_nomina,      -- Period
+        id_emplea,        -- Employee ID
+        id_concepto,      -- Concept ID
+        wval_dias,        -- Days worked
+        wval_concepto     -- Amount
+    );
+    ```
+  </Step>
+</Steps>
+
+## Result Structure
+
+Each payroll calculation creates multiple records in `tab_nomina`, one for each concept applied to each employee:
+
+| Field | Description |
+|-------|-------------|
+| `ano_nomina` | Payroll year |
+| `mes_nomina` | Payroll month (1-12) |
+| `per_nomina` | Period within month (1 or 2) |
+| `id_emplea` | Employee identifier |
+| `id_concepto` | Concept identifier (salary, transport, EPS, etc.) |
+| `val_dias_trab` | Number of days worked in period |
+| `val_nomina` | Calculated amount for this concept |
+
+## Example Calculation
+
+For an employee with basic salary of $5,000,000/month in a biweekly system:
+
+**Earnings (Devengados):**
+- Basic Salary (15 days): $5,000,000 / 2 = **$2,500,000**
+- Transportation Subsidy: $200,000 / 2 = **$100,000** (if eligible)
+- **Total Earnings**: $2,600,000
+
+**Deductions (Deducidos):**
+- EPS (4%): ($5,000,000 × 0.04) / 2 = **$100,000**
+- AFP (4%): ($5,000,000 × 0.04) / 2 = **$100,000**
+- **Total Deductions**: $200,000
+
+**Net Payment**: $2,600,000 - $200,000 = **$2,400,000**
+
+## Error Handling
+
+The calculation function includes comprehensive error handling:
+
+```sql
+EXCEPTION
+    WHEN SQLSTATE '22008' THEN
+        -- Year, month, or period doesn't match parameters
+    WHEN SQLSTATE '23502' THEN
+        -- NULL value in required ID field
+    WHEN SQLSTATE '23503' THEN  
+        -- Foreign key violation (invalid cargo/position)
+    WHEN SQLSTATE '23505' THEN  
+        -- Duplicate record
+    WHEN SQLSTATE 'P0001' THEN
+        -- Insert operation failed
+```
+
+See the [Error Handling Guide](/guides/error-handling) for complete SQLSTATE documentation.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Concepts" icon="sliders" href="/guides/concepts-configuration">
+    Learn how to create and configure payroll concepts
+  </Card>
+  <Card title="Manage Employees" icon="users" href="/guides/employee-management">
+    Understand employee lifecycle and payroll integration
+  </Card>
+</CardGroup>

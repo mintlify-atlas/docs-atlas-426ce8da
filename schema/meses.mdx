@@ -1,0 +1,191 @@
+---
+title: tab_meses Table
+description: Month catalog table (enero to diciembre)
+---
+
+## Overview
+
+The `tab_meses` table is a reference catalog containing the 12 months of the year. It's used throughout the payroll system to ensure month values are valid and to provide month names for reporting.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS tab_meses
+(
+    id_mes          DECIMAL(2,0)    NOT NULL    CHECK(id_mes >= 1 AND id_mes <= 12),
+    nom_mes         VARCHAR         NOT NULL    CHECK(LENGTH(nom_mes) >= 4),
+    PRIMARY KEY(id_mes)
+);
+```
+
+## Column Reference
+
+<ParamField path="id_mes" type="DECIMAL(2,0)" required>
+  Month number (1-12). Primary key.
+  
+  **Constraint**: `id_mes >= 1 AND id_mes <= 12`
+</ParamField>
+
+<ParamField path="nom_mes" type="VARCHAR" required>
+  Name of the month in Spanish. Must be at least 4 characters.
+  
+  **Constraint**: `LENGTH(nom_mes) >= 4`
+</ParamField>
+
+## Constraints
+
+### Primary Key
+- **id_mes**: Unique month identifier (1-12)
+
+### Check Constraints
+- **id_mes**: Must be between 1 and 12 (inclusive)
+- **nom_mes**: Must be at least 4 characters long
+
+## Complete Month Data
+
+The table contains all 12 months in Spanish:
+
+```sql
+INSERT INTO tab_meses VALUES(1,  'Enero');
+INSERT INTO tab_meses VALUES(2,  'febrero');
+INSERT INTO tab_meses VALUES(3,  'Marzo');
+INSERT INTO tab_meses VALUES(4,  'Abril');
+INSERT INTO tab_meses VALUES(5,  'Mayo');
+INSERT INTO tab_meses VALUES(6,  'junio');
+INSERT INTO tab_meses VALUES(7,  'Julio');
+INSERT INTO tab_meses VALUES(8,  'Agosto');
+INSERT INTO tab_meses VALUES(9,  'Septiembre');
+INSERT INTO tab_meses VALUES(10, 'Octubre');
+INSERT INTO tab_meses VALUES(11, 'Noviembre');
+INSERT INTO tab_meses VALUES(12, 'Diciembre');
+```
+
+## Month Reference
+
+| id_mes | nom_mes | Quarter | Season (Colombia) |
+|--------|---------|---------|-------------------|
+| 1 | Enero | Q1 | Dry season |
+| 2 | febrero | Q1 | Dry season |
+| 3 | Marzo | Q1 | Dry season |
+| 4 | Abril | Q2 | Rainy season |
+| 5 | Mayo | Q2 | Rainy season |
+| 6 | junio | Q2 | Rainy season |
+| 7 | Julio | Q3 | Dry season |
+| 8 | Agosto | Q3 | Dry season |
+| 9 | Septiembre | Q3 | Rainy season |
+| 10 | Octubre | Q4 | Rainy season |
+| 11 | Noviembre | Q4 | Rainy season |
+| 12 | Diciembre | Q4 | Dry season |
+
+## Usage Examples
+
+### Get Current Month Name
+
+```sql
+SELECT nom_mes
+FROM tab_meses
+WHERE id_mes = EXTRACT(MONTH FROM CURRENT_DATE);
+```
+
+### List All Months
+
+```sql
+SELECT id_mes, nom_mes
+FROM tab_meses
+ORDER BY id_mes;
+```
+
+### Get Quarter Months
+
+```sql
+-- Get Q1 months (January to March)
+SELECT id_mes, nom_mes
+FROM tab_meses
+WHERE id_mes BETWEEN 1 AND 3;
+```
+
+### Validate Month Number
+
+```sql
+SELECT EXISTS(
+    SELECT 1 FROM tab_meses WHERE id_mes = 5
+) as is_valid_month;
+```
+
+## Related Tables
+
+The `tab_meses` table is referenced by:
+
+### tab_pmtros
+Stores the current month for payroll processing:
+```sql
+FOREIGN KEY(mes_nomina) REFERENCES tab_meses(id_mes) 
+  ON DELETE CASCADE ON UPDATE CASCADE
+```
+
+### tab_novedades
+References the month for payroll novelties:
+```sql
+FOREIGN KEY(mes_nomina) REFERENCES tab_meses(id_mes) 
+  ON DELETE CASCADE ON UPDATE CASCADE
+```
+
+### tab_nomina
+References the month for final payroll:
+```sql
+FOREIGN KEY(mes_nomina) REFERENCES tab_meses(id_mes) 
+  ON DELETE CASCADE ON UPDATE CASCADE
+```
+
+## Reporting Examples
+
+### Payroll Summary by Month
+
+```sql
+SELECT m.nom_mes, 
+       COUNT(n.id_emplea) as empleados,
+       SUM(n.val_nomina) as total_nomina
+FROM tab_meses m
+LEFT JOIN tab_nomina n ON m.id_mes = n.mes_nomina
+WHERE n.ano_nomina = 2025
+GROUP BY m.id_mes, m.nom_mes
+ORDER BY m.id_mes;
+```
+
+### Find Missing Payroll Months
+
+```sql
+SELECT m.id_mes, m.nom_mes
+FROM tab_meses m
+WHERE NOT EXISTS (
+    SELECT 1 
+    FROM tab_nomina n 
+    WHERE n.mes_nomina = m.id_mes 
+      AND n.ano_nomina = 2025
+)
+ORDER BY m.id_mes;
+```
+
+## Data Quality Notes
+
+<Note>
+  Notice that "febrero" and "junio" are lowercase in the sample data, while other months are capitalized. This inconsistency should be standardized in production:
+  
+  ```sql
+  UPDATE tab_meses SET nom_mes = 'Febrero' WHERE id_mes = 2;
+  UPDATE tab_meses SET nom_mes = 'Junio' WHERE id_mes = 6;
+  ```
+</Note>
+
+<Info>
+  This table is a static reference table and should be populated once during database initialization. The data rarely (if ever) changes.
+</Info>
+
+## Best Practices
+
+<Check>
+  - Keep month names consistent (all capitalized or all lowercase)
+  - Do not delete or modify month records as they are referenced by payroll data
+  - Use this table for month validation in application logic
+  - Join with this table in reports to display month names instead of numbers
+</Check>

@@ -1,0 +1,55 @@
+---
+title: 'fun_insert_cargos'
+description: 'Insert a new position into the positions table'
+---
+
+## Overview
+
+Inserts a new position record into `tab_cargos` with an auto-incremented ID.
+
+## Signature
+
+```sql
+fun_insert_cargos(
+    wnom_cargo VARCHAR
+) RETURNS BOOLEAN
+```
+
+## Parameters
+
+<ParamField path="wnom_cargo" type="VARCHAR" required>
+  Position name (3-40 characters)
+</ParamField>
+
+## Returns
+
+- `TRUE` - Position inserted successfully
+- `FALSE` - Insert failed
+
+## Example Usage
+
+```sql
+-- Insert a new position
+SELECT fun_insert_cargos('developer');
+
+-- Insert another position
+SELECT fun_insert_cargos('project manager');
+```
+
+## Validation Rules
+
+- Position name must be between 3 and 40 characters
+- Position name cannot be NULL
+- Duplicate position names are not allowed
+
+## Error Handling
+
+| SQL State | Description |
+|-----------|-------------|
+| 23505 | NULL value in ID field |
+| 23514 | Value violates check constraint |
+| others | Unknown error during insert |
+
+## Source
+
+`source/func/cargos/fun_insert_cargos.sql`

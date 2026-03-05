@@ -1,0 +1,46 @@
+---
+title: 'fun_insert_meses'
+description: 'Insert a new month into the months table'
+---
+
+## Overview
+
+Inserts a new month record into `tab_meses` with an auto-incremented ID.
+
+## Signature
+
+```sql
+fun_insert_meses(
+    wname_mes VARCHAR
+) RETURNS VARCHAR
+```
+
+## Parameters
+
+<ParamField path="wname_mes" type="VARCHAR" required>
+  Month name
+</ParamField>
+
+## Returns
+
+- `'todo bn'` - Month inserted successfully
+- Other message - Insert failed
+
+## Example Usage
+
+```sql
+-- Insert a new month
+SELECT fun_insert_meses('mayo');
+
+-- Insert another month
+SELECT fun_insert_meses('junio');
+```
+
+## Validation Rules
+
+- Month name cannot be NULL
+- Month name should be unique
+
+## Source
+
+`source/func/meses/fun_insert_meses.sql`

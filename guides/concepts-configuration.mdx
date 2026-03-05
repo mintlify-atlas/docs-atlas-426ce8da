@@ -1,0 +1,623 @@
+---
+title: "Concepts Configuration Guide"
+description: "Learn how to configure and manage payroll concepts including earnings, deductions, and calculation rules"
+---
+
+## Overview
+
+Payroll concepts (`tab_conceptos`) define all the components that make up an employee's compensation - both earnings (devengados) and deductions (deducidos). Each concept specifies calculation rules, whether it's mandatory, and the payment frequency.
+
+## Concept Structure
+
+The `tab_conceptos` table contains the following fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id_concepto` | DECIMAL(2) | Unique concept identifier (1-99) |
+| `nom_concepto` | VARCHAR | Concept name (≥ 5 characters) |
+| `ind_operacion` | BOOLEAN | Operation type: TRUE = Add (earnings), FALSE = Subtract (deductions) |
+| `ind_perio_pago` | CHAR(1) | Payment frequency: 'Q' = Biweekly, 'M' = Monthly |
+| `neto_pagado` | BOOLEAN | TRUE if this represents net payment, FALSE otherwise |
+| `val_porcent` | DECIMAL(3,0) | Percentage value (0-999), 0 if not applicable |
+| `val_fijo` | DECIMAL(8,0) | Fixed amount (0-99,999,999), 0 if not applicable |
+| `ind_legal` | BOOLEAN | TRUE = Mandatory/legal concept, FALSE = Optional |
+
+## Concept Types
+
+### Mandatory vs. Optional Concepts
+
+Concepts are categorized by the `ind_legal` field:
+
+<Tabs>
+  <Tab title="Mandatory (ind_legal = TRUE)">
+    **Legally Required Concepts**
+    
+    These concepts are automatically processed for every employee during payroll calculation:
+    
+    - Basic Salary (Salario Básico)
+    - Transportation Subsidy (Auxilio de Transporte)
+    - Health Insurance - EPS (4%)
+    - Pension Fund - AFP (4%)
+    
+    ```sql
+    SELECT id_concepto, nom_concepto, ind_operacion, val_porcent, val_fijo 
+    FROM tab_conceptos 
+    WHERE ind_legal = TRUE;
+    ```
+    
+    <Note>
+    Mandatory concepts are queried and applied in the payroll calculation function:
+    ```sql
+    wquery_conc = 'SELECT a.id_concepto, a.nom_concepto, a.ind_operacion, 
+                          a.val_porcent, a.val_fijo 
+                   FROM tab_conceptos a 
+                   WHERE a.neto_pagado = FALSE AND a.ind_legal = TRUE';
+    ```
+    </Note>
+  </Tab>
+  
+  <Tab title="Optional (ind_legal = FALSE)">
+    **Discretionary Concepts (Novelties)**
+    
+    These concepts are only applied when specified in `tab_novedades`:
+    
+    - Bonuses (e.g., Bonificación por chismoso)
+    - Overtime pay (Daytime, Nighttime, Holidays)
+    - Loan deductions (Descuento por Préstamo)
+    - Special allowances
+    
+    ```sql
+    SELECT id_concepto, nom_concepto, ind_operacion, val_porcent, val_fijo 
+    FROM tab_conceptos 
+    WHERE ind_legal = FALSE;
+    ```
+    
+    Optional concepts are processed separately:
+    ```sql
+    wquery_noveda = 'SELECT a.id_concepto, a.nom_concepto, a.ind_operacion, 
+                            a.val_porcent, a.val_fijo 
+                     FROM tab_conceptos a 
+                     WHERE a.neto_pagado = FALSE AND a.ind_legal = FALSE';
+    ```
+  </Tab>
+</Tabs>
+
+### Earnings vs. Deductions
+
+The `ind_operacion` field determines how the concept affects total compensation:
+
+<CardGroup cols={2}>
+  <Card title="Earnings (TRUE)" icon="plus">
+    Concepts that **add** to employee compensation:
+    - Basic Salary
+    - Transportation Subsidy  
+    - Overtime Pay
+    - Bonuses
+    - Allowances
+    
+    These increase `wsum_devengado` (total earnings)
+  </Card>
+  
+  <Card title="Deductions (FALSE)" icon="minus">
+    Concepts that **subtract** from employee compensation:
+    - Health Insurance (EPS)
+    - Pension Fund (AFP)
+    - Loan Repayments
+    - Advances
+    
+    These increase `wsum_deducido` (total deductions)
+  </Card>
+</CardGroup>
+
+## Calculation Methods
+
+Concepts can be calculated using percentage, fixed value, or both:
+
+### Percentage-Based Calculations
+
+When `val_porcent` is non-zero, the concept is calculated as a percentage of the basic salary:
+
+```sql
+IF wreg_concep.val_porcent <> 0 THEN
+    wval_concepto = (wreg_emplea.val_sal_basico * wreg_concep.val_porcent) / 100;
+    
+    -- Adjust for payment period
+    IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+        wval_concepto = wval_concepto / 2;
+    END IF;
+END IF;
+```
+
+**Example Percentage-Based Concepts:**
+
+| Concept | ID | Percentage | Description |
+|---------|----|-----------:|-------------|
+| EPS (Health) | 3 | 4% | Monthly health insurance deduction |
+| AFP (Pension) | 4 | 4% | Monthly pension fund deduction |
+| Overtime - Daytime | 7 | 25% | 25% premium on hourly rate |
+| Overtime - Nighttime | 8 | 75% | 75% premium on hourly rate |
+| Overtime - Holiday Day | 9 | 100% | 100% premium on hourly rate |
+| Overtime - Holiday Night | 10 | 150% | 150% premium on hourly rate |
+
+<Accordion title="Example: Calculate EPS Deduction">
+  For an employee earning $8,000,000/month:
+  
+  ```sql
+  -- EPS is 4% of basic salary
+  val_porcent = 4
+  val_sal_basico = 8000000
+  
+  -- Monthly calculation
+  wval_concepto = (8000000 * 4) / 100 = 320000
+  
+  -- If biweekly payment:
+  wval_concepto = 320000 / 2 = 160000
+  ```
+  
+  Result: $320,000/month or $160,000/biweekly period
+</Accordion>
+
+### Fixed-Value Calculations
+
+When `val_fijo` is non-zero, the concept uses a fixed amount:
+
+```sql
+IF wreg_concep.val_fijo <> 0 THEN
+    wval_concepto = wreg_concep.val_fijo;
+    
+    -- Adjust for payment period
+    IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+        wval_concepto = wval_concepto / 2;
+    END IF;
+END IF;
+```
+
+**Example Fixed-Value Concepts:**
+
+| Concept | ID | Fixed Amount | Description |
+|---------|----|-----------:|-------------|
+| Transportation Subsidy | 2 | $200,000 | Monthly transport allowance (if eligible) |
+| Special Bonus | 6 | $100,000 | Monthly bonus for achievements |
+
+<Accordion title="Example: Transportation Subsidy">
+  The transportation subsidy is a fixed amount set by government:
+  
+  ```sql
+  -- From tab_pmtros
+  val_auxtrans = 200000  -- Fixed amount
+  
+  -- Monthly payment
+  wval_trans = 200000
+  
+  -- Biweekly payment  
+  wval_trans = 200000 / 2 = 100000
+  ```
+  
+  Result: $200,000/month or $100,000/biweekly period (only for eligible employees)
+</Accordion>
+
+### Hybrid Calculations
+
+Some concepts could theoretically use both percentage and fixed values:
+
+```sql
+IF wreg_concep.val_porcent <> 0 THEN
+    wval_concepto = (wreg_emplea.val_sal_basico * wreg_concep.val_porcent) / 100;
+END IF;
+
+IF wreg_concep.val_fijo <> 0 THEN
+    wval_concepto = wval_concepto + wreg_concep.val_fijo;
+END IF;
+```
+
+<Warning>
+In practice, most concepts use **either** percentage **or** fixed value, not both. Set unused field to 0.
+</Warning>
+
+## Standard Concept Catalog
+
+### Mandatory Earnings (ind_legal = TRUE, ind_operacion = TRUE)
+
+```sql
+-- Basic Salary (ID 1)
+INSERT INTO tab_conceptos VALUES(
+    1,                      -- id_concepto
+    'Salario Básico',       -- nom_concepto
+    TRUE,                   -- ind_operacion (earnings)
+    'Q',                    -- ind_perio_pago (biweekly)
+    FALSE,                  -- neto_pagado
+    0,                      -- val_porcent (N/A)
+    0,                      -- val_fijo (uses employee salary)
+    TRUE                    -- ind_legal (mandatory)
+);
+
+-- Transportation Subsidy (ID 2)
+INSERT INTO tab_conceptos VALUES(
+    2,
+    'Auxilio de Transporte',
+    TRUE,
+    'Q',
+    FALSE,
+    0,                      -- val_porcent (N/A)
+    0,                      -- val_fijo (uses pmtros.val_auxtrans)
+    TRUE
+);
+```
+
+<Note>
+IDs 1 and 2 are special:
+- ID 1 is referenced in `tab_pmtros.id_concep_sb` (basic salary concept)
+- ID 2 is referenced in `tab_pmtros.id_concep_at` (transportation concept)
+
+The payroll calculation function uses these IDs to identify special handling logic.
+</Note>
+
+### Mandatory Deductions (ind_legal = TRUE, ind_operacion = FALSE)
+
+```sql
+-- Health Insurance - EPS (ID 3)
+INSERT INTO tab_conceptos VALUES(
+    3,
+    'Entidad Prestadora de Salud (EPS)',
+    FALSE,                  -- ind_operacion (deduction)
+    'M',                    -- ind_perio_pago (monthly)
+    FALSE,
+    4,                      -- val_porcent (4%)
+    0,                      -- val_fijo (N/A)
+    TRUE
+);
+
+-- Pension Fund - AFP (ID 4)
+INSERT INTO tab_conceptos VALUES(
+    4,
+    'Administradora de Pensión (AFP)',
+    FALSE,
+    'M',
+    FALSE,
+    4,                      -- val_porcent (4%)
+    0,
+    TRUE
+);
+```
+
+### Optional Earnings (ind_legal = FALSE, ind_operacion = TRUE)
+
+```sql
+-- Monthly Bonus (ID 6)
+INSERT INTO tab_conceptos VALUES(
+    6,
+    'Bonificación por chismoso',
+    TRUE,
+    'M',
+    FALSE,
+    0,
+    100000,                 -- Fixed $100,000 bonus
+    FALSE                   -- Optional (novelty)
+);
+
+-- Overtime - Daytime (ID 7)
+INSERT INTO tab_conceptos VALUES(
+    7,
+    'Horas Extras Diurnas',
+    TRUE,
+    'Q',
+    FALSE,
+    25,                     -- 25% premium
+    0,
+    FALSE
+);
+
+-- Overtime - Nighttime (ID 8)
+INSERT INTO tab_conceptos VALUES(
+    8,
+    'Horas Extras Nocturna',
+    TRUE,
+    'Q',
+    FALSE,
+    75,                     -- 75% premium
+    0,
+    FALSE
+);
+
+-- Overtime - Holiday Daytime (ID 9)
+INSERT INTO tab_conceptos VALUES(
+    9,
+    'Horas Extras Festivas Diurnas',
+    TRUE,
+    'Q',
+    FALSE,
+    100,                    -- 100% premium
+    0,
+    FALSE
+);
+
+-- Overtime - Holiday Nighttime (ID 10)
+INSERT INTO tab_conceptos VALUES(
+    10,
+    'Horas Extras Festivas Nocturnas',
+    TRUE,
+    'Q',
+    FALSE,
+    150,                    -- 150% premium
+    0,
+    FALSE
+);
+```
+
+### Optional Deductions (ind_legal = FALSE, ind_operacion = FALSE)
+
+```sql
+-- Loan Deduction (ID 11)
+INSERT INTO tab_conceptos VALUES(
+    11,
+    'Descuento por Préstamo',
+    FALSE,
+    'M',
+    FALSE,
+    10,                     -- 10% of salary
+    0,
+    FALSE
+);
+```
+
+## Creating New Concepts
+
+Use the `fun_insert_conceptos()` function to create new payroll concepts:
+
+### Function Signature
+
+```sql
+fun_insert_conceptos(
+    wnom_concepto,      -- Concept name
+    wind_operacion,     -- TRUE = earnings, FALSE = deductions
+    wind_perio_pago,    -- 'Q' = biweekly, 'M' = monthly
+    wneto_pagado,       -- Usually FALSE
+    wval_porcent,       -- Percentage (0-999), or 0 if N/A
+    wval_fijo,          -- Fixed amount, or 0 if N/A
+    wind_legal          -- TRUE = mandatory, FALSE = optional
+)
+```
+
+### Example: Create Meal Allowance Concept
+
+<Steps>
+  <Step title="Determine concept parameters">
+    - Name: "Auxilio de Alimentación" (Meal Allowance)
+    - Type: Earning (TRUE)
+    - Frequency: Monthly ('M')
+    - Not net payment (FALSE)
+    - Fixed amount: $150,000
+    - Optional (FALSE - requires novelty entry)
+  </Step>
+  
+  <Step title="Execute insert function">
+    ```sql
+    SELECT fun_insert_conceptos(
+        'Auxilio de Alimentación',  -- Concept name
+        TRUE,                        -- Earnings (adds to salary)
+        'M',                         -- Monthly payment
+        FALSE,                       -- Not net payment
+        0,                           -- No percentage
+        150000,                      -- Fixed $150,000
+        FALSE                        -- Optional (novelty-based)
+    );
+    ```
+  </Step>
+  
+  <Step title="Verify creation">
+    ```sql
+    SELECT * FROM tab_conceptos 
+    WHERE nom_concepto = 'Auxilio de Alimentación';
+    ```
+  </Step>
+</Steps>
+
+### Example: Create Commission Concept
+
+```sql
+SELECT fun_insert_conceptos(
+    'Comisión por Ventas',      -- Sales commission
+    TRUE,                        -- Earnings
+    'M',                         -- Monthly
+    FALSE,                       -- Not net payment
+    5,                           -- 5% of base salary
+    0,                           -- No fixed amount
+    FALSE                        -- Optional (for sales staff only)
+);
+```
+
+## Updating Concepts
+
+Use `fun_update_conceptos()` to modify existing concepts:
+
+```sql
+fun_update_conceptos(
+    wid_concepto,       -- Concept ID to update
+    wnom_concepto,      -- All other parameters same as insert
+    wind_operacion,
+    wind_perio_pago,
+    wneto_pagado,
+    wval_porcent,
+    wval_fijo,
+    wind_legal
+)
+```
+
+### Example: Update Pension Percentage
+
+If government changes pension contribution from 4% to 5%:
+
+```sql
+SELECT fun_update_conceptos(
+    4,                                      -- Concept ID (AFP)
+    'Administradora de Pensión (AFP)',      -- Same name
+    FALSE,                                   -- Still a deduction
+    'M',                                     -- Still monthly
+    FALSE,                                   -- Not net payment
+    5,                                       -- NEW: Updated to 5%
+    0,                                       -- Still no fixed amount
+    TRUE                                     -- Still mandatory
+);
+```
+
+<Warning>
+Updating concepts affects **future** payroll calculations. Historical payroll records (`tab_nomina`) are not retroactively changed.
+</Warning>
+
+## Deleting Concepts
+
+Use `fun_delete_conceptos()` to remove concepts:
+
+```sql
+SELECT fun_delete_conceptos(concept_id);
+```
+
+<Warning>
+**Critical Constraints:**
+
+1. Cannot delete concepts referenced in `tab_pmtros`:
+   - `id_concep_sb` (Basic Salary concept)
+   - `id_concep_at` (Transportation concept)
+
+2. Deleting concepts will **cascade delete**:
+   - All payroll records using this concept
+   - All novelty records using this concept
+
+3. Only delete:
+   - Test concepts
+   - Obsolete optional concepts with no history
+</Warning>
+
+## Payment Frequency Considerations
+
+### Biweekly ('Q') vs Monthly ('M')
+
+The `ind_perio_pago` field determines when the concept applies:
+
+<Tabs>
+  <Tab title="Biweekly (Q)">
+    Applied in **both** payroll periods:
+    - Period 1 (first half of month)
+    - Period 2 (second half of month)
+    
+    Examples:
+    - Basic Salary (divided by 2)
+    - Transportation Subsidy (divided by 2)
+    - Overtime pay
+    
+    ```sql
+    -- Biweekly concepts are halved when period is Q
+    IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+        wval_concepto = wval_concepto / 2;
+    END IF;
+    ```
+  </Tab>
+  
+  <Tab title="Monthly (M)">
+    Applied **once per month** regardless of payroll frequency:
+    - Health insurance (EPS)
+    - Pension fund (AFP)
+    - Monthly bonuses
+    
+    <Note>
+    Even if company pays biweekly, monthly concepts are split:
+    - First period: Half of monthly amount
+    - Second period: Half of monthly amount
+    </Note>
+  </Tab>
+</Tabs>
+
+## Validation Rules
+
+The concept table enforces several constraints:
+
+```sql
+CHECK(LENGTH(nom_concepto) >= 5)                    -- Name at least 5 chars
+CHECK(ind_perio_pago = 'Q' OR ind_perio_pago = 'M') -- Only Q or M allowed
+CHECK(val_porcent >= 0)                             -- Non-negative percentage
+CHECK(val_fijo >= 0)                                -- Non-negative fixed value
+```
+
+### Insert Function Validations
+
+The `fun_insert_conceptos()` function includes additional validations:
+
+```sql
+-- Name length check
+IF LENGTH(wnom_concepto) < 5 THEN
+    RAISE NOTICE 'ese nombre está muy cortico qcho';
+    RETURN FALSE;
+END IF;
+
+-- Payment period validation
+IF wind_perio_pago NOT IN ('Q','M') THEN
+    RAISE NOTICE 'valor incorrecto, se debe escribir Q si va a pagar quincenal o M para mensual';
+    RETURN FALSE;
+END IF;
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Naming Conventions">
+    - Use descriptive names (≥ 5 characters)
+    - Include concept type in name when helpful
+    - Be consistent with Spanish/English choice
+    - Examples:
+      - ✅ "Auxilio de Transporte"
+      - ✅ "Horas Extras Nocturnas"
+      - ❌ "AET" (too cryptic)
+      - ❌ "Bono" (too short)
+  </Accordion>
+  
+  <Accordion title="Percentage vs Fixed">
+    - Use **percentage** for concepts that scale with salary:
+      - Health insurance
+      - Pension contributions
+      - Overtime premiums
+    
+    - Use **fixed value** for concepts with set amounts:
+      - Transportation subsidy (government-mandated)
+      - Meal allowances
+      - Uniform allowances
+    
+    - Set unused field to 0 (don't leave NULL)
+  </Accordion>
+  
+  <Accordion title="Mandatory vs Optional">
+    - Set `ind_legal = TRUE` for:
+      - Government-mandated deductions
+      - Standard salary components
+      - Concepts applied to ALL employees
+    
+    - Set `ind_legal = FALSE` for:
+      - Position-specific bonuses
+      - Overtime (varies by employee)
+      - Discretionary allowances
+      - Loan deductions
+  </Accordion>
+  
+  <Accordion title="Frequency Selection">
+    - Use 'M' (Monthly) for:
+      - Social security deductions (EPS, AFP)
+      - Monthly bonuses
+      - Recurring monthly allowances
+    
+    - Use 'Q' (Biweekly) for:
+      - Basic salary
+      - Transportation subsidy
+      - Overtime pay
+      - Variable earnings
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payroll Calculation" icon="calculator" href="/guides/payroll-calculation">
+    See how concepts are applied in payroll processing
+  </Card>
+  <Card title="Function Reference" icon="code" href="/functions/conceptos/fun_insert_conceptos">
+    Concept management functions
+  </Card>
+</CardGroup>

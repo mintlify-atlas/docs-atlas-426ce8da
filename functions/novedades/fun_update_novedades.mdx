@@ -1,0 +1,89 @@
+---
+title: 'fun_update_novedades'
+description: 'Update an existing payroll novelty'
+---
+
+## Overview
+
+Updates a payroll novelty record in `tab_novedades` identified by year, month, and period.
+
+## Signature
+
+```sql
+fun_update_novedades(
+    wano_nom INTEGER,
+    wmes_nom INTEGER,
+    wper_nom INTEGER,
+    wid_emplea INTEGER,
+    wid_concepto INTEGER,
+    wval_dias_trab INTEGER,
+    wval_nomina NUMERIC
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wano_nom" type="INTEGER" required>
+  Payroll year (Primary Key)
+</ParamField>
+
+<ParamField path="wmes_nom" type="INTEGER" required>
+  Payroll month (Primary Key)
+</ParamField>
+
+<ParamField path="wper_nom" type="INTEGER" required>
+  Payroll period (Primary Key)
+</ParamField>
+
+<ParamField path="wid_emplea" type="INTEGER" required>
+  New employee ID
+</ParamField>
+
+<ParamField path="wid_concepto" type="INTEGER" required>
+  New concept ID
+</ParamField>
+
+<ParamField path="wval_dias_trab" type="INTEGER" required>
+  New number of days worked
+</ParamField>
+
+<ParamField path="wval_nomina" type="NUMERIC" required>
+  New payroll value
+</ParamField>
+
+## Returns
+
+VOID (no return value)
+
+## Example Usage
+
+```sql
+-- Update a novelty
+SELECT fun_update_novedades(
+    2024,
+    3,
+    1,
+    1,
+    1,
+    20,
+    4500000
+);
+```
+
+## Validation Rules
+
+- The novelty identified by year, month, and period must exist
+- Employee ID must exist in tab_emplea
+- Concept ID must exist in tab_conceptos
+- Days worked must be positive
+- Payroll value must be positive
+
+## Notes
+
+<Warning>
+Updating the primary key values (year, month, period) will create a new record rather than updating the existing one.
+</Warning>
+
+## Source
+
+`source/func/novedades/fun_update_novedades.sql`

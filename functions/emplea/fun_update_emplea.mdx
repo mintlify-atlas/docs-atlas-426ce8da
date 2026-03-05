@@ -1,0 +1,141 @@
+---
+title: 'fun_update_emplea'
+description: 'Updates an existing employee record in the tab_emplea table'
+---
+
+## Overview
+
+This function updates an existing employee record in the `tab_emplea` table. It allows modification of all employee fields except the employee ID, which is used to identify the record to update.
+
+## Function Signature
+
+```sql
+CREATE OR REPLACE FUNCTION fun_update_emplea(
+    wid_emplea tab_emplea.id_emplea%TYPE,
+    wnom_emplea tab_emplea.nom_emplea%TYPE,
+    wape_emplea tab_emplea.ape_emplea%TYPE,
+    wind_genero tab_emplea.ind_genero%TYPE,
+    wdir_emplea tab_emplea.dir_emplea%TYPE,
+    wtel_emplea tab_emplea.tel_emplea%TYPE,
+    wind_estrato tab_emplea.ind_estrato%TYPE,
+    wind_est_civil tab_emplea.ind_est_civil%TYPE,
+    wnum_hijos tab_emplea.num_hijos%TYPE,
+    wval_tipo_sangre tab_emplea.val_tipo_sangre%TYPE,
+    wval_edad tab_emplea.val_edad%TYPE,
+    wid_cargo tab_emplea.id_cargo%TYPE,
+    wval_sal_basico tab_emplea.val_sal_basico%TYPE,
+    wfec_ingreso tab_emplea.fec_ingreso%TYPE
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wid_emplea" type="INTEGER" required>
+  Employee ID to update (identifies the record)
+</ParamField>
+
+<ParamField path="wnom_emplea" type="VARCHAR">
+  Employee's first name
+</ParamField>
+
+<ParamField path="wape_emplea" type="VARCHAR">
+  Employee's last name
+</ParamField>
+
+<ParamField path="wind_genero" type="CHAR(1)">
+  Gender indicator (e.g., 'M' for male, 'F' for female)
+</ParamField>
+
+<ParamField path="wdir_emplea" type="VARCHAR">
+  Employee's address
+</ParamField>
+
+<ParamField path="wtel_emplea" type="VARCHAR">
+  Employee's phone number
+</ParamField>
+
+<ParamField path="wind_estrato" type="INTEGER">
+  Socioeconomic stratum indicator (1-6)
+</ParamField>
+
+<ParamField path="wind_est_civil" type="CHAR">
+  Civil status indicator (e.g., 'S' for single, 'C' for married)
+</ParamField>
+
+<ParamField path="wnum_hijos" type="INTEGER">
+  Number of children
+</ParamField>
+
+<ParamField path="wval_tipo_sangre" type="VARCHAR">
+  Blood type (e.g., 'O+', 'A-', 'B+', 'AB-')
+</ParamField>
+
+<ParamField path="wval_edad" type="INTEGER">
+  Employee's age
+</ParamField>
+
+<ParamField path="wid_cargo" type="INTEGER">
+  Position ID (foreign key to tab_cargos)
+</ParamField>
+
+<ParamField path="wval_sal_basico" type="NUMERIC">
+  Base salary amount
+</ParamField>
+
+<ParamField path="wfec_ingreso" type="DATE">
+  Date of hire
+</ParamField>
+
+## Return Type
+
+`VOID` - This function does not return a value. It performs an UPDATE operation.
+
+## Business Logic
+
+1. **Record Identification**: Uses `wid_emplea` to locate the specific employee record to update
+2. **Complete Update**: All fields are updated simultaneously; the function does not support partial updates
+3. **Referential Integrity**: The new `wid_cargo` must exist in the `tab_cargos` table
+4. **Silent Failure**: If the employee ID does not exist, the function completes without error but no records are updated
+
+## Usage Example
+
+```sql
+-- Update an employee's information
+SELECT fun_update_emplea(
+    1,                        -- Employee ID to update
+    'Juan Carlos',            -- Updated first name
+    'Pérez García',           -- Updated last name
+    'M',                      -- Gender
+    'Calle 123 #45-67 Apt 501', -- Updated address
+    '3009876543',             -- Updated phone
+    4,                        -- Updated stratum
+    'C',                      -- Married
+    3,                        -- Updated number of children
+    'O+',                     -- Blood type
+    36,                       -- Updated age
+    2,                        -- Updated position ID
+    3000000.00,               -- Updated base salary
+    '2024-03-24'              -- Original hire date
+);
+```
+
+## Common Use Cases
+
+- **Data Correction**: Fix incorrectly entered names or personal information
+- **Promotion**: Update position and salary when an employee is promoted
+- **Personal Changes**: Update marital status, number of children, address, or phone number
+- **Annual Updates**: Update age and salary during annual reviews
+
+## Notes
+
+- All employee fields must be provided, even if only one field needs to be updated
+- To perform a partial update, first query the current values and pass them along with the changed fields
+- The function does not validate if the employee ID exists before attempting the update
+- Ensure the position ID exists in `tab_cargos` before calling this function
+
+## Source
+
+Location: `~/workspace/source/func/emplea/fun_update_emplea.sql:9`
+
+Author: Camilo Suárez  
+Date: 24/03/2025

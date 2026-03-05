@@ -1,0 +1,367 @@
+---
+title: 'fun_act_nomina'
+description: 'Core payroll calculation engine that processes payroll for all employees based on period, concepts, and deductions'
+---
+
+## Overview
+
+The `fun_act_nomina` function is the heart of the NominaSoft payroll system. This function calculates the complete payroll for all active employees for a specific year, month, and period. It processes both mandatory legal concepts (salary, transportation allowance, deductions) and optional concepts (bonuses, overtime), generating detailed payroll records in the `tab_nomina` table.
+
+This function orchestrates the entire payroll calculation workflow by:
+- Validating input parameters against system configuration
+- Iterating through all employees
+- Calculating mandatory and optional payroll concepts
+- Computing accruals (devengados) and deductions (deducidos)
+- Generating individual payroll records for each employee-concept combination
+
+## Function Signature
+
+```sql
+CREATE OR REPLACE FUNCTION fun_act_nomina(
+    wano_nomina tab_nomina.ano_nomina%TYPE,
+    wmes_nomina tab_nomina.mes_nomina%TYPE,
+    wper_nomina tab_nomina.per_nomina%TYPE
+) RETURNS BOOLEAN
+```
+
+## Parameters
+
+<ParamField path="wano_nomina" type="INTEGER" required>
+  The payroll year to process. Must match the year configured in `tab_pmtros.ano_nomina`.
+  
+  **Example:** `2025`
+</ParamField>
+
+<ParamField path="wmes_nomina" type="INTEGER" required>
+  The payroll month to process (1-12). Must match the month configured in `tab_pmtros.mes_nomina`.
+  
+  **Example:** `1` (January)
+</ParamField>
+
+<ParamField path="wper_nomina" type="INTEGER" required>
+  The payroll period within the month:
+  - `1` = First period (first half of month for biweekly, full month for monthly)
+  - `2` = Second period (second half of month for biweekly)
+  
+  Must be ≤ 2. The actual days covered depends on `tab_pmtros.ind_perio_pago` ('Q' for biweekly/quincenal, 'M' for monthly/mensual).
+  
+  **Example:** `1`
+</ParamField>
+
+## Return Value
+
+Returns `BOOLEAN`:
+- `TRUE` - Payroll was successfully calculated and saved to `tab_nomina`
+- `FALSE` - An error occurred during processing (see exception messages)
+
+## Algorithm and Business Logic
+
+### 1. Parameter Loading and Validation
+
+The function begins by loading the system parameters from `tab_pmtros`:
+
+```sql
+SELECT a.id_empresa, a.nom_empresa, a.ind_perio_pago, a.val_smlv, 
+       a.val_auxtrans, a.ind_num_trans, a.ano_nomina, a.mes_nomina, 
+       a.num_diasmes, a.id_concep_sb, a.id_concep_at 
+INTO wreg_pmtros 
+FROM tab_pmtros a;
+```
+
+**Validation Rules:**
+- Input year must match `tab_pmtros.ano_nomina` (SQLSTATE 22008)
+- Input month must match `tab_pmtros.mes_nomina` (SQLSTATE 22008)
+- Period must be ≤ 2 (SQLSTATE 22008)
+
+**Days Calculation:**
+```sql
+IF wreg_pmtros.ind_perio_pago = 'Q' THEN
+    wval_dias = wreg_pmtros.num_diasmes / 2;  -- Biweekly: 15 days
+ELSE
+    wval_dias = wreg_pmtros.num_diasmes;      -- Monthly: 30 days
+END IF;
+```
+
+### 2. Payroll Reset
+
+The function deletes any existing payroll records for the specified period to ensure a clean recalculation:
+
+```sql
+DELETE FROM tab_nomina
+WHERE ano_nomina = wano_nomina 
+  AND mes_nomina = wmes_nomina 
+  AND per_nomina = wper_nomina;
+```
+
+### 3. Employee Iteration
+
+For each active employee in `tab_emplea`, the function retrieves:
+- `id_emplea` - Employee ID
+- `nom_emplea` - Employee first name
+- `ape_emplea` - Employee last name
+- `val_sal_basico` - Base salary
+
+### 4. Mandatory Concepts Processing
+
+For each employee, the function processes all mandatory legal concepts (`ind_legal = TRUE`, `neto_pagado = FALSE`):
+
+#### A. Accruals (Devengados - `ind_operacion = TRUE`)
+
+**Basic Salary Calculation:**
+```sql
+-- Determine period salary
+IF ind_perio_pago = 'Q' THEN
+    wval_salario = val_sal_basico / 2;  -- Biweekly
+ELSE
+    wval_salario = val_sal_basico;      -- Monthly
+END IF;
+
+-- Calculate proportional salary based on days worked
+wsum_devengado = wsum_devengado + ((wval_salario / num_diasmes) * wval_dias);
+```
+
+**Transportation Allowance (Auxilio de Transporte):**
+Only applies if employee's base salary ≤ (SMLV × ind_num_trans):
+
+```sql
+IF val_sal_basico <= (val_smlv * ind_num_trans) THEN
+    IF ind_perio_pago = 'Q' THEN
+        wval_trans = val_auxtrans / 2;  -- Biweekly
+    ELSE
+        wval_trans = val_auxtrans;      -- Monthly
+    END IF;
+    wsum_devengado = wsum_devengado + wval_trans;
+END IF;
+```
+
+#### B. Deductions (Deducidos - `ind_operacion = FALSE`)
+
+**Percentage-Based Deductions:**
+```sql
+IF val_porcent <> 0 THEN
+    wval_concepto = (val_sal_basico * val_porcent) / 100;
+    IF ind_perio_pago = 'Q' THEN
+        wval_concepto = wval_concepto / 2;
+    END IF;
+    wsum_deducido = wsum_deducido + wval_concepto;
+END IF;
+```
+
+**Fixed-Value Deductions:**
+```sql
+IF val_fijo <> 0 THEN
+    wval_concepto = (val_sal_basico + val_fijo);
+    IF ind_perio_pago = 'Q' THEN
+        wval_concepto = wval_concepto / 2;
+    END IF;
+    wsum_deducido = wsum_deducido + wval_concepto;
+END IF;
+```
+
+### 5. Record Generation
+
+For each employee-concept combination, a record is inserted into `tab_nomina`:
+
+```sql
+INSERT INTO tab_nomina VALUES(
+    wano_nomina,           -- Year
+    wmes_nomina,           -- Month
+    wper_nomina,           -- Period
+    id_emplea,             -- Employee ID
+    id_concepto,           -- Concept ID
+    wval_dias,             -- Days paid
+    wval_concepto          -- Concept value
+);
+```
+
+### 6. Optional Concepts (Novedades)
+
+The function includes logic structure for processing non-mandatory concepts (`ind_legal = FALSE`) such as:
+- Bonuses (bonificaciones)
+- Overtime hours (horas extras diurnas/nocturnas/festivas)
+- Other variable concepts
+
+*Note: This section is prepared but currently commented in the source code (lines 224-258).*
+
+## Usage Examples
+
+### Example 1: Process January 2025 First Period
+
+```sql
+-- Process payroll for first half of January 2025
+SELECT fun_act_nomina(2025, 1, 1);
+```
+
+**Result:** `TRUE` if successful
+
+This will:
+1. Delete existing payroll for 2025-01, period 1
+2. Calculate payroll for all employees
+3. Generate individual records for each concept (salary, transportation, deductions)
+4. Store results in `tab_nomina`
+
+### Example 2: Process February 2025 Second Period (Biweekly)
+
+```sql
+-- Process payroll for second half of February 2025
+SELECT fun_act_nomina(2025, 2, 2);
+```
+
+**Result:** `TRUE` if successful (assuming biweekly payment configuration)
+
+### Example 3: Monthly Payroll Processing
+
+```sql
+-- For monthly payroll (ind_perio_pago = 'M'), process full month
+SELECT fun_act_nomina(2025, 3, 1);
+```
+
+### Example 4: Error Handling
+
+```sql
+-- This will fail if tab_pmtros is configured for 2025-01
+SELECT fun_act_nomina(2024, 12, 1);
+```
+
+**Result:** `FALSE` with notice: "El año, o el mes, o el período no corresponden al de PMTROS... Arréglelo Bestia"
+
+## Exception Handling
+
+The function implements comprehensive error handling with specific SQLSTATE codes:
+
+<ResponseField name="22008" type="datetime_field_overflow">
+  **Invalid Year, Month, or Period**
+  
+  Raised when input parameters don't match system configuration in `tab_pmtros`.
+  
+  **Message:** "El año, o el mes, o el período no corresponden al de PMTROS... Arréglelo Bestia"
+  
+  **Resolution:** Verify `ano_nomina`, `mes_nomina` in `tab_pmtros` match your input parameters, and ensure period ≤ 2.
+</ResponseField>
+
+<ResponseField name="23502" type="not_null_violation">
+  **NULL Value in Required Field**
+  
+  Raised when attempting to insert NULL into a NOT NULL column.
+  
+  **Message:** "Está mandando un NULO en el ID... Sea serio"
+  
+  **Resolution:** Ensure all required fields have valid values before processing.
+</ResponseField>
+
+<ResponseField name="23503" type="foreign_key_violation">
+  **Foreign Key Violation**
+  
+  Raised when referencing a non-existent record (e.g., invalid cargo/position).
+  
+  **Message:** "El Cargo no existe... Créelo y vuelva, o ni se aparezca más por acá"
+  
+  **Resolution:** Create the referenced record (cargo, concepto, etc.) before running payroll.
+</ResponseField>
+
+<ResponseField name="23505" type="unique_violation">
+  **Duplicate Record**
+  
+  Raised when attempting to insert a duplicate record.
+  
+  **Message:** "El registro ya existe.. Trabaje bien o ábrase llaveee"
+  
+  **Resolution:** This should not occur as the function deletes existing records first. Check for concurrent execution.
+</ResponseField>
+
+<ResponseField name="22001" type="string_data_right_truncation">
+  **String Too Long**
+  
+  Raised when a string value exceeds the column's maximum length.
+  
+  **Message:** "El nombre es muy corto.. Es de su abuelita?"
+  
+  **Resolution:** Ensure all string values comply with column length constraints.
+</ResponseField>
+
+<ResponseField name="P0001" type="raise_exception">
+  **Insert Failed**
+  
+  Raised when an INSERT operation fails unexpectedly.
+  
+  **Resolution:** Check database constraints, trigger logic, and data integrity.
+</ResponseField>
+
+## Database Dependencies
+
+### Tables Read
+- `tab_pmtros` - System parameters (payment period, SMLV, etc.)
+- `tab_emplea` - Employee master data
+- `tab_conceptos` - Payroll concepts (salary, deductions, bonuses)
+
+### Tables Modified
+- `tab_nomina` - Payroll records (DELETE existing + INSERT new records)
+
+### Required Configuration
+
+Before running this function, ensure:
+
+1. **System Parameters** (`tab_pmtros`) are configured:
+   - `ano_nomina`, `mes_nomina` - Current payroll period
+   - `ind_perio_pago` - 'Q' (biweekly) or 'M' (monthly)
+   - `val_smlv` - Current minimum wage
+   - `val_auxtrans` - Transportation allowance amount
+   - `ind_num_trans` - SMLV multiplier for transport eligibility
+   - `num_diasmes` - Days in the period (typically 30)
+   - `id_concep_sb` - Concept ID for basic salary
+   - `id_concep_at` - Concept ID for transportation allowance
+
+2. **Employees** (`tab_emplea`) exist with valid `val_sal_basico`
+
+3. **Concepts** (`tab_conceptos`) are defined with proper configuration
+
+## Performance Considerations
+
+- The function processes **all employees** in the database in a single execution
+- Uses cursors for iterating through employees and concepts
+- Deletes and regenerates all payroll records for the period
+- Execution time increases linearly with number of employees and concepts
+- Consider scheduling during off-peak hours for large employee bases
+
+## Best Practices
+
+1. **Always validate parameters** before calling:
+   ```sql
+   SELECT ano_nomina, mes_nomina FROM tab_pmtros;
+   ```
+
+2. **Check results** after execution:
+   ```sql
+   SELECT * FROM tab_nomina 
+   WHERE ano_nomina = 2025 AND mes_nomina = 1 AND per_nomina = 1
+   ORDER BY id_emplea, id_concepto;
+   ```
+
+3. **Run reports** to verify calculations:
+   ```sql
+   -- Summary by employee
+   SELECT id_emplea, 
+          SUM(CASE WHEN c.ind_operacion THEN val_nomina ELSE 0 END) AS total_accrued,
+          SUM(CASE WHEN NOT c.ind_operacion THEN val_nomina ELSE 0 END) AS total_deducted
+   FROM tab_nomina n
+   JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+   WHERE ano_nomina = 2025 AND mes_nomina = 1 AND per_nomina = 1
+   GROUP BY id_emplea;
+   ```
+
+4. **Backup before execution** in production environments
+
+5. **Test thoroughly** with sample data before production use
+
+## Related Functions
+
+- [fun_act_empleado](/functions/employees/fun_act_empleado) - Employee management
+- [fun_act_concepto](/functions/concepts/fun_act_concepto) - Payroll concept management
+- [fun_get_neto_pagado](/functions/payroll/fun_get_neto_pagado) - Calculate net payment per employee
+
+## Notes
+
+- This function uses **PostgreSQL PL/pgSQL** language
+- The commented code (lines 224-258) shows planned support for optional concepts (novedades)
+- Function includes detailed RAISE NOTICE statements for debugging purposes
+- All monetary calculations respect the payment period configuration (Q/M)

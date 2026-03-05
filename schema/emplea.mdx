@@ -1,0 +1,347 @@
+---
+title: tab_emplea Table
+description: Employee personal and labor information
+---
+
+## Overview
+
+The `tab_emplea` table stores comprehensive employee information including personal data, contact details, family information, and labor-related fields. This is the core employee master data table in the payroll system.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS tab_emplea
+(
+-- DATOS BÁSICOS DEL EMPLEADO
+    id_emplea       DECIMAL(10)     NOT NULL,
+    nom_emplea      VARCHAR         NOT NULL    CHECK (TRIM(nom_emplea) != '' AND LENGTH(nom_emplea)>=3),
+    ape_emplea      VARCHAR         NOT NULL    CHECK (TRIM(ape_emplea) != '' AND LENGTH(ape_emplea)>=2),
+    ind_genero      BOOLEAN         NOT NULL, -- TRUE = FEMENINO / FALSE = MASCULINO
+    dir_emplea      VARCHAR         NOT NULL    CHECK (TRIM(dir_emplea) != '' AND LENGTH(dir_emplea)>=5),
+    tel_emplea      DECIMAL(10,0)   NOT NULL    CHECK(tel_emplea = FLOOR(tel_emplea)),
+    ind_estrato     DECIMAL(1)      NOT NULL    CHECK(ind_estrato BETWEEN 1 AND 6),
+
+-- DATOS PERSONALES
+    ind_est_civil   DECIMAL(1)      NOT NULL    CHECK(ind_est_civil BETWEEN 0 AND 4),
+    num_hijos       DECIMAL(1,0)    NOT NULL    CHECK(num_hijos >= 0 AND num_hijos = FLOOR(num_hijos)),
+    val_tipo_sangre VARCHAR         NOT NULL,
+    val_edad        DECIMAL(2,0)    NOT NULL    CHECK(val_edad >= 16),
+
+-- DATOS LABORALES
+    id_cargo        DECIMAL(2,0)    NOT NULL,
+    val_sal_basico  DECIMAL(8)      NOT NULL    CHECK(val_sal_basico >= 0),
+    fec_ingreso     DATE            NOT NULL,
+
+    PRIMARY KEY(id_emplea),
+    FOREIGN KEY(id_cargo)   REFERENCES tab_cargos(id_cargo) ON DELETE CASCADE ON UPDATE CASCADE
+);
+```
+
+## Column Reference
+
+### Basic Employee Data
+
+<ParamField path="id_emplea" type="DECIMAL(10)" required>
+  Unique employee identifier (typically Colombian cédula/ID number). Primary key.
+</ParamField>
+
+<ParamField path="nom_emplea" type="VARCHAR" required>
+  Employee first name(s). Must be at least 3 characters, cannot be empty or only whitespace.
+  
+  **Constraint**: `TRIM(nom_emplea) != '' AND LENGTH(nom_emplea) >= 3`
+</ParamField>
+
+<ParamField path="ape_emplea" type="VARCHAR" required>
+  Employee last name(s). Must be at least 2 characters, cannot be empty or only whitespace.
+  
+  **Constraint**: `TRIM(ape_emplea) != '' AND LENGTH(ape_emplea) >= 2`
+</ParamField>
+
+<ParamField path="ind_genero" type="BOOLEAN" required>
+  Gender indicator:
+  - `TRUE`: Femenino (Female)
+  - `FALSE`: Masculino (Male)
+</ParamField>
+
+<ParamField path="dir_emplea" type="VARCHAR" required>
+  Employee address. Must be at least 5 characters.
+  
+  **Constraint**: `TRIM(dir_emplea) != '' AND LENGTH(dir_emplea) >= 5`
+</ParamField>
+
+<ParamField path="tel_emplea" type="DECIMAL(10,0)" required>
+  10-digit phone number (Colombian mobile format).
+  
+  **Constraint**: `tel_emplea = FLOOR(tel_emplea)` (must be integer)
+</ParamField>
+
+<ParamField path="ind_estrato" type="DECIMAL(1)" required>
+  Socioeconomic stratum (Colombian classification system, 1-6):
+  - 1: Bajo-Bajo (Very Low)
+  - 2: Bajo (Low)
+  - 3: Medio-Bajo (Medium-Low)
+  - 4: Medio (Medium)
+  - 5: Medio-Alto (Medium-High)
+  - 6: Alto (High)
+  
+  **Constraint**: `ind_estrato BETWEEN 1 AND 6`
+</ParamField>
+
+### Personal Data
+
+<ParamField path="ind_est_civil" type="DECIMAL(1)" required>
+  Marital status indicator:
+  - 0: Soltero (Single)
+  - 1: Casado (Married)
+  - 2: Divorciado (Divorced)
+  - 3: Viudo (Widowed)
+  - 4: Otro (Other)
+  
+  **Constraint**: `ind_est_civil BETWEEN 0 AND 4`
+</ParamField>
+
+<ParamField path="num_hijos" type="DECIMAL(1,0)" required>
+  Number of children (0-9).
+  
+  **Constraint**: `num_hijos >= 0 AND num_hijos = FLOOR(num_hijos)`
+</ParamField>
+
+<ParamField path="val_tipo_sangre" type="VARCHAR" required>
+  Blood type (e.g., A+, O-, AB+, etc.).
+</ParamField>
+
+<ParamField path="val_edad" type="DECIMAL(2,0)" required>
+  Employee age in years. Must be at least 16 (minimum working age in Colombia).
+  
+  **Constraint**: `val_edad >= 16`
+  
+  <Note>Consider calculating from birth date instead of storing directly</Note>
+</ParamField>
+
+### Labor Data
+
+<ParamField path="id_cargo" type="DECIMAL(2,0)" required>
+  Foreign key to tab_cargos (employee position/role).
+</ParamField>
+
+<ParamField path="val_sal_basico" type="DECIMAL(8)" required>
+  Employee basic monthly salary in Colombian Pesos.
+  
+  **Constraint**: `val_sal_basico >= 0`
+</ParamField>
+
+<ParamField path="fec_ingreso" type="DATE" required>
+  Date when employee joined the company.
+</ParamField>
+
+## Constraints
+
+### Primary Key
+- **id_emplea**: Unique employee ID (cédula)
+
+### Foreign Keys
+- **id_cargo** → tab_cargos(id_cargo)
+  - ON DELETE CASCADE
+  - ON UPDATE CASCADE
+
+### Check Constraints
+- **nom_emplea**: Not empty, minimum 3 characters
+- **ape_emplea**: Not empty, minimum 2 characters
+- **dir_emplea**: Not empty, minimum 5 characters
+- **tel_emplea**: Must be integer (10 digits)
+- **ind_estrato**: 1-6 (Colombian socioeconomic strata)
+- **ind_est_civil**: 0-4 (marital status codes)
+- **num_hijos**: >= 0, must be integer
+- **val_edad**: >= 16 (minimum working age)
+- **val_sal_basico**: >= 0
+
+## Sample Data
+
+### Example Employees
+
+```sql
+-- Gerente de TI
+INSERT INTO tab_emplea VALUES(
+    91423627, 'Carlos Eduardo', 'Perez Rueda', FALSE,
+    'Calle 20', 3503421739, 4,
+    0, 3, 'A+', 61,
+    5, 10000000, '2024-01-01'
+);
+
+-- Gerente Comercial
+INSERT INTO tab_emplea VALUES(
+    1032505813, 'Laura Juliana', 'Perez Barrera', TRUE,
+    'Calle 138 Carrera 54', 3102454737, 5,
+    0, 0, 'A+', 25,
+    3, 8000000, '2024-10-01'
+);
+
+-- Desarrollador Front Senior
+INSERT INTO tab_emplea VALUES(
+    1015000000, 'Carlos Chaparro', 'Perez Moscoso', FALSE,
+    'Girón', 3102222222, 4,
+    0, 0, 'O+', 40,
+    9, 6000000, '2024-01-01'
+);
+
+-- Desarrollador Back Junior
+INSERT INTO tab_emplea VALUES(
+    1015000002, 'Juan Pablo', 'Lopez Bobito', FALSE,
+    'Piedecuesta', 3104444444, 4,
+    0, 1, 'A+', 18,
+    12, 5000000, '2024-01-01'
+);
+
+-- Servicios Generales
+INSERT INTO tab_emplea VALUES(
+    1015000004, 'Juana', 'La Loca', TRUE,
+    'Calle 28 Cra. 18', 3106666666, 3,
+    0, 3, 'A-', 25,
+    16, 2500000, '2024-01-01'
+);
+```
+
+## Reference Data
+
+### Gender Codes
+| ind_genero | Description |
+|------------|-------------|
+| TRUE | Femenino (Female) |
+| FALSE | Masculino (Male) |
+
+### Marital Status Codes
+| ind_est_civil | Description |
+|---------------|-------------|
+| 0 | Soltero (Single) |
+| 1 | Casado (Married) |
+| 2 | Divorciado (Divorced) |
+| 3 | Viudo (Widowed) |
+| 4 | Otro (Other) |
+
+### Socioeconomic Strata (Colombian System)
+| ind_estrato | Description | Characteristics |
+|-------------|-------------|------------------|
+| 1 | Bajo-Bajo | Lowest income, subsidized services |
+| 2 | Bajo | Low income, partial subsidies |
+| 3 | Medio-Bajo | Lower-middle income |
+| 4 | Medio | Middle income |
+| 5 | Medio-Alto | Upper-middle income, pays surcharges |
+| 6 | Alto | High income, pays higher surcharges |
+
+### Blood Types
+Common values: A+, A-, B+, B-, AB+, AB-, O+, O-
+
+## Usage Examples
+
+### List All Employees
+
+```sql
+SELECT e.id_emplea, 
+       e.nom_emplea || ' ' || e.ape_emplea as nombre_completo,
+       c.nom_cargo,
+       e.val_sal_basico
+FROM tab_emplea e
+JOIN tab_cargos c ON e.id_cargo = c.id_cargo
+ORDER BY e.ape_emplea, e.nom_emplea;
+```
+
+### Find High Earners
+
+```sql
+SELECT nom_emplea, ape_emplea, val_sal_basico
+FROM tab_emplea
+WHERE val_sal_basico > 5000000
+ORDER BY val_sal_basico DESC;
+```
+
+### Employees by Position
+
+```sql
+SELECT c.nom_cargo, COUNT(*) as cantidad
+FROM tab_emplea e
+JOIN tab_cargos c ON e.id_cargo = c.id_cargo
+GROUP BY c.nom_cargo
+ORDER BY cantidad DESC;
+```
+
+### Calculate Years of Service
+
+```sql
+SELECT id_emplea,
+       nom_emplea || ' ' || ape_emplea as nombre,
+       fec_ingreso,
+       EXTRACT(YEAR FROM AGE(CURRENT_DATE, fec_ingreso)) as anos_servicio
+FROM tab_emplea
+ORDER BY fec_ingreso;
+```
+
+### Employees by Gender
+
+```sql
+SELECT 
+    CASE WHEN ind_genero THEN 'Femenino' ELSE 'Masculino' END as genero,
+    COUNT(*) as cantidad
+FROM tab_emplea
+GROUP BY ind_genero;
+```
+
+### Employees Eligible for Transport Allowance
+
+```sql
+SELECT e.id_emplea,
+       e.nom_emplea || ' ' || e.ape_emplea as nombre,
+       e.val_sal_basico,
+       p.val_smlv * p.ind_num_trans as limite
+FROM tab_emplea e
+CROSS JOIN tab_pmtros p
+WHERE e.val_sal_basico < (p.val_smlv * p.ind_num_trans);
+```
+
+### Demographics Report
+
+```sql
+SELECT 
+    ind_estrato,
+    COUNT(*) as empleados,
+    AVG(val_sal_basico) as salario_promedio,
+    AVG(val_edad) as edad_promedio
+FROM tab_emplea
+GROUP BY ind_estrato
+ORDER BY ind_estrato;
+```
+
+## Related Tables
+
+- **tab_cargos**: Defines employee positions (id_cargo)
+- **tab_novedades**: Records payroll novelties per employee
+- **tab_nomina**: Stores final payroll calculations per employee
+
+## Notes
+
+<Warning>
+  The val_edad field stores age directly, which becomes outdated. Consider replacing with fec_nacimiento (birth date) and calculating age dynamically:
+  ```sql
+  EXTRACT(YEAR FROM AGE(CURRENT_DATE, fec_nacimiento))
+  ```
+</Warning>
+
+<Info>
+  Colombian phone numbers (tel_emplea) typically start with 3 and have 10 digits total. Mobile numbers follow the format 3XX XXX XXXX.
+</Info>
+
+<Note>
+  The ind_estrato field is specific to Colombia's socioeconomic stratification system, used for determining utility rates and social benefits.
+</Note>
+
+## Indexed Fields (Commented)
+
+The schema includes suggested indexes (currently commented out):
+
+```sql
+CREATE INDEX idx_nom_emplea      ON tab_emplea(nom_emplea);
+CREATE INDEX idx_ape_emplea      ON tab_emplea(ape_emplea);
+CREATE INDEX idx_ind_estrato     ON tab_emplea(ind_estrato);
+CREATE INDEX idx_val_tipo_sangre ON tab_emplea(val_tipo_sangre);
+```
+
+Consider enabling these for better search performance on large datasets.

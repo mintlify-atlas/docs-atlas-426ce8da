@@ -1,0 +1,45 @@
+---
+title: 'fun_delete_meses'
+description: 'Delete a month from the months table'
+---
+
+## Overview
+
+Deletes a month record from `tab_meses` by ID.
+
+## Signature
+
+```sql
+fun_delete_meses(
+    wid_mes INTEGER
+) RETURNS VARCHAR
+```
+
+## Parameters
+
+<ParamField path="wid_mes" type="INTEGER" required>
+  Month ID to delete
+</ParamField>
+
+## Returns
+
+`'si se pudo, crack'` - Success message
+
+## Example Usage
+
+```sql
+-- Delete a month
+SELECT fun_delete_meses(1);
+
+-- Delete month with ID 3
+SELECT fun_delete_meses(3);
+```
+
+## Validation Rules
+
+- Month ID must exist
+- Cannot delete months referenced by payroll records
+
+## Source
+
+`source/func/meses/fun_delete_meses.sql`

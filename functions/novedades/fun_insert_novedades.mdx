@@ -1,0 +1,94 @@
+---
+title: 'fun_insert_novedades'
+description: 'Insert a new payroll novelty'
+---
+
+## Overview
+
+Inserts a new payroll novelty (novedad) into `tab_novedades` with employee, concept, and value information.
+
+## Signature
+
+```sql
+fun_insert_novedades(
+    wano_nom INTEGER,
+    wmes_nom INTEGER,
+    wper_nom INTEGER,
+    wid_emplea INTEGER,
+    wid_concepto INTEGER,
+    wval_dias_trab INTEGER,
+    wval_nomina NUMERIC
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wano_nom" type="INTEGER" required>
+  Payroll year (Primary Key)
+</ParamField>
+
+<ParamField path="wmes_nom" type="INTEGER" required>
+  Payroll month (Primary Key)
+</ParamField>
+
+<ParamField path="wper_nom" type="INTEGER" required>
+  Payroll period (Primary Key)
+</ParamField>
+
+<ParamField path="wid_emplea" type="INTEGER" required>
+  Employee ID (Foreign Key to tab_emplea)
+</ParamField>
+
+<ParamField path="wid_concepto" type="INTEGER" required>
+  Concept ID (Foreign Key to tab_conceptos)
+</ParamField>
+
+<ParamField path="wval_dias_trab" type="INTEGER" required>
+  Number of days worked
+</ParamField>
+
+<ParamField path="wval_nomina" type="NUMERIC" required>
+  Payroll value for this novelty
+</ParamField>
+
+## Returns
+
+VOID (no return value)
+
+## Example Usage
+
+```sql
+-- Insert a novelty
+SELECT fun_insert_novedades(
+    1987,
+    3,
+    1,
+    1,
+    1,
+    17,
+    4500000
+);
+
+-- Insert another novelty record
+SELECT fun_insert_novedades(
+    2025,
+    1,
+    1,
+    5,
+    2,
+    15,
+    3200000
+);
+```
+
+## Validation Rules
+
+- Year, month, and period form a composite primary key
+- Employee ID must exist in tab_emplea
+- Concept ID must exist in tab_conceptos
+- Days worked must be positive
+- Payroll value must be positive
+
+## Source
+
+`source/func/novedades/fun_insert_novedades.sql`

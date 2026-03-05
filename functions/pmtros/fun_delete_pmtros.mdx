@@ -1,0 +1,45 @@
+---
+title: 'fun_delete_pmtros'
+description: 'Delete payroll parameters'
+---
+
+## Overview
+
+Deletes a payroll parameters record from `tab_pmtros` by company ID.
+
+## Signature
+
+```sql
+fun_delete_pmtros(
+    wid_empresa INTEGER
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wid_empresa" type="INTEGER" required>
+  Company ID to delete
+</ParamField>
+
+## Returns
+
+VOID (no return value)
+
+## Example Usage
+
+```sql
+-- Delete payroll parameters
+SELECT fun_delete_pmtros(2);
+
+-- Delete company parameters
+SELECT fun_delete_pmtros(1);
+```
+
+## Validation Rules
+
+- Company ID must exist
+- Cannot delete parameters referenced by active payroll records
+
+## Source
+
+`source/func/pmtros/fun_delete_pmtros.sql`

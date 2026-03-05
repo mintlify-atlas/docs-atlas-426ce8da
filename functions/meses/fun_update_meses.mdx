@@ -1,0 +1,50 @@
+---
+title: 'fun_update_meses'
+description: 'Update an existing month name'
+---
+
+## Overview
+
+Updates the name of an existing month in `tab_meses`.
+
+## Signature
+
+```sql
+fun_update_meses(
+    wid_mes INTEGER,
+    new_nom_mes VARCHAR
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wid_mes" type="INTEGER" required>
+  Month ID to update
+</ParamField>
+
+<ParamField path="new_nom_mes" type="VARCHAR" required>
+  New month name
+</ParamField>
+
+## Returns
+
+VOID (no return value)
+
+## Example Usage
+
+```sql
+-- Update month name
+SELECT fun_update_meses(4, 'el mes del más lindo');
+
+-- Update to standard month name
+SELECT fun_update_meses(1, 'enero');
+```
+
+## Validation Rules
+
+- Month ID must exist in the table
+- New month name cannot be NULL
+
+## Source
+
+`source/func/meses/fun_update_meses.sql`

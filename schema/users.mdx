@@ -1,0 +1,120 @@
+---
+title: users Table
+description: User authentication and login management table
+---
+
+## Overview
+
+The `users` table manages user authentication and login credentials for the NominaSoft system. It stores basic user profile information including username, password, email, and name.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS users
+(
+    uid                 SERIAL          NOT NULL,
+    username            VARCHAR         NOT NULL,
+    password            VARCHAR         NOT NULL,
+    email               VARCHAR         NOT NULL,
+    name                VARCHAR         NOT NULL,
+    PRIMARY KEY(uid)
+);
+```
+
+## Column Reference
+
+<ParamField path="uid" type="SERIAL" required>
+  Unique identifier for each user (auto-incremented). Primary key.
+</ParamField>
+
+<ParamField path="username" type="VARCHAR" required>
+  User's login username. Must be unique for authentication.
+</ParamField>
+
+<ParamField path="password" type="VARCHAR" required>
+  User's password (should be hashed in application layer).
+</ParamField>
+
+<ParamField path="email" type="VARCHAR" required>
+  User's email address for notifications and recovery.
+</ParamField>
+
+<ParamField path="name" type="VARCHAR" required>
+  User's full name or display name.
+</ParamField>
+
+## Constraints
+
+### Primary Key
+- **uid**: Auto-incrementing unique identifier
+
+### Not Null Constraints
+- All columns are required (NOT NULL)
+
+## Usage Notes
+
+<Note>
+  The password field stores passwords. In production, ensure passwords are properly hashed using bcrypt, Argon2, or similar algorithms before storage.
+</Note>
+
+<Warning>
+  This table does not include constraints for unique usernames or emails. Consider adding unique constraints in production:
+  ```sql
+  ALTER TABLE users ADD CONSTRAINT unique_username UNIQUE (username);
+  ALTER TABLE users ADD CONSTRAINT unique_email UNIQUE (email);
+  ```
+</Warning>
+
+## Security Considerations
+
+1. **Password Hashing**: Always hash passwords before storing them
+2. **Username Uniqueness**: Implement unique constraint on username
+3. **Email Validation**: Validate email format in application layer
+4. **Session Management**: Implement secure session handling with uid
+
+## Example Queries
+
+### Insert New User
+
+```sql
+INSERT INTO users (username, password, email, name) 
+VALUES ('jdoe', 'hashed_password_here', 'jdoe@company.com', 'John Doe');
+```
+
+### Authenticate User
+
+```sql
+SELECT uid, name, email 
+FROM users 
+WHERE username = 'jdoe' AND password = 'hashed_password';
+```
+
+### List All Users
+
+```sql
+SELECT uid, username, email, name 
+FROM users 
+ORDER BY name;
+```
+
+### Update User Email
+
+```sql
+UPDATE users 
+SET email = 'newemail@company.com' 
+WHERE uid = 1;
+```
+
+## Related Tables
+
+The `users` table is independent and does not have foreign key relationships with other tables in the payroll schema. It serves purely for authentication purposes.
+
+## Best Practices
+
+<Check>
+  - Store hashed passwords only (never plain text)
+  - Implement rate limiting for login attempts
+  - Add created_at and updated_at timestamps
+  - Consider adding role/permission fields for access control
+  - Implement account status (active/inactive/locked)
+</Check>

@@ -1,0 +1,55 @@
+---
+title: 'fun_delete_novedades'
+description: 'Delete a payroll novelty'
+---
+
+## Overview
+
+Deletes a payroll novelty record from `tab_novedades` by year, month, and period.
+
+## Signature
+
+```sql
+fun_delete_novedades(
+    wano_nom INTEGER,
+    wmes_nom INTEGER,
+    wper_nom INTEGER
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wano_nom" type="INTEGER" required>
+  Payroll year (Primary Key)
+</ParamField>
+
+<ParamField path="wmes_nom" type="INTEGER" required>
+  Payroll month (Primary Key)
+</ParamField>
+
+<ParamField path="wper_nom" type="INTEGER" required>
+  Payroll period (Primary Key)
+</ParamField>
+
+## Returns
+
+VOID (no return value)
+
+## Example Usage
+
+```sql
+-- Delete a novelty
+SELECT fun_delete_novedades(2024, 3, 1);
+
+-- Delete another novelty
+SELECT fun_delete_novedades(2025, 1, 2);
+```
+
+## Validation Rules
+
+- The novelty identified by year, month, and period must exist
+- All three components of the composite key are required
+
+## Source
+
+`source/func/novedades/fun_delete_novedades.sql`

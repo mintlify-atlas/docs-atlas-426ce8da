@@ -1,0 +1,56 @@
+---
+title: 'fun_delete_conceptos'
+description: 'Delete a payroll concept'
+---
+
+## Overview
+
+Deletes a payroll concept record from `tab_conceptos` by ID.
+
+## Signature
+
+```sql
+fun_delete_conceptos(
+    wid_concepto INTEGER
+) RETURNS BOOLEAN
+```
+
+## Parameters
+
+<ParamField path="wid_concepto" type="INTEGER" required>
+  Concept ID to delete
+</ParamField>
+
+## Returns
+
+- `TRUE` - Concept deleted successfully
+- `FALSE` - Delete failed
+
+## Example Usage
+
+```sql
+-- Delete a concept
+SELECT fun_delete_conceptos(4);
+
+-- Delete concept with ID 2
+SELECT fun_delete_conceptos(2);
+```
+
+## Validation Rules
+
+- Concept ID must exist
+- Cannot delete concepts referenced by payroll novelties
+
+## Error Handling
+
+| SQL State | Description |
+|-----------|-------------|
+| 02000 | Concept ID does not exist |
+| 23502 | Attempted to use NULL value |
+| 22003 | Number is too large |
+| 22P02 | Invalid data format |
+| others | Unknown error |
+
+## Source
+
+`source/func/conceptos/fun_delete_conceptos.sql`

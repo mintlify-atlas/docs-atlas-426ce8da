@@ -1,0 +1,116 @@
+---
+title: 'fun_delete_emplea'
+description: 'Deletes an employee record from the tab_emplea table'
+---
+
+## Overview
+
+This function deletes an employee record from the `tab_emplea` table based on the employee ID. Use with caution as this operation is permanent and may be affected by referential integrity constraints.
+
+## Function Signature
+
+```sql
+CREATE OR REPLACE FUNCTION fun_delete_emplea(
+    wid_emplea tab_emplea.id_emplea%TYPE
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wid_emplea" type="INTEGER" required>
+  Employee ID to delete. This identifies the specific employee record to remove from the database.
+</ParamField>
+
+## Return Type
+
+`VOID` - This function does not return a value. It performs a DELETE operation.
+
+## Business Logic
+
+1. **Simple Deletion**: Removes the employee record matching the provided ID
+2. **Referential Integrity**: May fail if the employee has related records in other tables (e.g., `tab_novedades`, `tab_nomina`)
+3. **Silent Success**: If the employee ID does not exist, the function completes without error but no records are deleted
+4. **No Soft Delete**: This is a hard delete operation; the record is permanently removed
+
+## Usage Example
+
+```sql
+-- Delete an employee with ID 5
+SELECT fun_delete_emplea(5);
+
+-- Verify deletion
+SELECT COUNT(*) FROM tab_emplea WHERE id_emplea = 5;
+-- Should return 0
+```
+
+## Referential Integrity Considerations
+
+Before deleting an employee, you may need to:
+
+1. **Check for Dependencies**: Verify if the employee has related records
+   ```sql
+   -- Check for payroll records
+   SELECT COUNT(*) FROM tab_nomina WHERE id_emplea = 5;
+   
+   -- Check for news/changes records
+   SELECT COUNT(*) FROM tab_novedades WHERE id_emplea = 5;
+   ```
+
+2. **Clean Up Related Records**: Delete or update dependent records first
+   ```sql
+   -- Example: Delete related payroll records first
+   DELETE FROM tab_nomina WHERE id_emplea = 5;
+   DELETE FROM tab_novedades WHERE id_emplea = 5;
+   
+   -- Then delete the employee
+   SELECT fun_delete_emplea(5);
+   ```
+
+## Error Handling
+
+If the employee has related records protected by foreign key constraints, the function will raise a PostgreSQL error:
+
+```
+ERROR: update or delete on table "tab_emplea" violates foreign key constraint
+```
+
+In this case, you must either:
+- Delete the related records first
+- Use CASCADE delete (if configured on the foreign key)
+- Keep the employee record and mark it as inactive (if your schema supports this)
+
+## Best Practices
+
+<Warning>
+  This operation is irreversible. Consider implementing a soft delete mechanism (e.g., an `active` flag) instead of permanently removing employee records for audit and historical purposes.
+</Warning>
+
+- **Backup First**: Always backup data before performing delete operations
+- **Use Transactions**: Wrap delete operations in transactions to allow rollback if needed
+- **Audit Trail**: Consider logging deletions for compliance and audit purposes
+- **Archive Instead**: For historical data integrity, consider archiving employees to a separate table instead of deleting
+
+## Transaction Example
+
+```sql
+BEGIN;
+    -- Delete related records
+    DELETE FROM tab_nomina WHERE id_emplea = 5;
+    DELETE FROM tab_novedades WHERE id_emplea = 5;
+    
+    -- Delete employee
+    SELECT fun_delete_emplea(5);
+    
+    -- Review changes before committing
+    -- If everything looks good:
+COMMIT;
+    -- Or if you need to undo:
+-- ROLLBACK;
+```
+
+## Source
+
+Location: `~/workspace/source/func/emplea/fun_delete_emplea.sql:8`
+
+Author: Camilo Suarez  
+Date: 24/03/2025

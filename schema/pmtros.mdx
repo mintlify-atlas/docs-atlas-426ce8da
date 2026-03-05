@@ -1,0 +1,288 @@
+---
+title: tab_pmtros Table
+description: Company payroll parameters and configuration
+---
+
+## Overview
+
+The `tab_pmtros` table stores company-wide payroll parameters and configuration settings. This includes legal minimum wage values, payment periods, current month/year, and references to key payroll concepts. This table typically contains a single record per company.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS tab_pmtros
+(
+    id_empresa      DECIMAL(10,0)   NOT NULL,
+    nom_empresa     VARCHAR         NOT NULL                    CHECK(LENGTH(nom_empresa) >= 5),
+    ind_perio_pago  CHAR(1)         NOT NULL    DEFAULT 'Q'     CHECK(ind_perio_pago = 'Q' OR ind_perio_pago = 'M'),
+    val_smlv        DECIMAL(8,0)    NOT NULL                    CHECK(val_smlv > 0),
+    val_auxtrans    DECIMAL (7,0)   NOT NULL                    CHECK(val_auxtrans > 0 AND val_auxtrans < val_smlv),
+    ind_num_trans   DECIMAL(1)      NOT NULL    DEFAULT 2       CHECK(ind_num_trans > 0 AND ind_num_trans < 4),
+    ano_nomina      DECIMAL(4,0)    NOT NULL    DEFAULT 2025,
+    mes_nomina      DECIMAL(2)      NOT NULL                    CHECK(mes_nomina >= 1 AND mes_nomina <= 12),
+    val_por_intces  DECIMAL(2,0)    NOT NULL    DEFAULT 12,
+    num_diasmes     DECIMAL(2,0)    NOT NULL    DEFAULT 30,
+    id_concep_sb    DECIMAL(2,0)    NOT NULL,
+    id_concep_at    DECIMAL(2,0)    NOT NULL,
+
+    PRIMARY KEY(id_empresa),
+    FOREIGN KEY(mes_nomina)    REFERENCES tab_meses(id_mes)            ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(id_concep_sb)  REFERENCES tab_conceptos(id_concepto)   ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(id_concep_at)  REFERENCES tab_conceptos(id_concepto)   ON DELETE CASCADE ON UPDATE CASCADE
+);
+```
+
+## Column Reference
+
+<ParamField path="id_empresa" type="DECIMAL(10,0)" required>
+  Unique identifier for the company processing payroll. Primary key.
+</ParamField>
+
+<ParamField path="nom_empresa" type="VARCHAR" required>
+  Company name. Must be at least 5 characters.
+  
+  **Constraint**: `LENGTH(nom_empresa) >= 5`
+</ParamField>
+
+<ParamField path="ind_perio_pago" type="CHAR(1)" default="Q">
+  Default payment period for the company:
+  - `'Q'`: Quincenal (Bi-weekly)
+  - `'M'`: Mensual (Monthly)
+  
+  **Constraint**: Must be 'Q' or 'M'
+</ParamField>
+
+<ParamField path="val_smlv" type="DECIMAL(8,0)" required>
+  Salario Mínimo Legal Vigente (Legal Minimum Wage) for the current year in Colombian Pesos.
+  
+  **Constraint**: `val_smlv > 0`
+  
+  Example: 1,423,500 COP for 2025
+</ParamField>
+
+<ParamField path="val_auxtrans" type="DECIMAL(7,0)" required>
+  Auxilio de Transporte (Transportation Allowance) for the current year in Colombian Pesos.
+  
+  **Constraint**: `val_auxtrans > 0 AND val_auxtrans < val_smlv`
+  
+  Example: 200,000 COP for 2025
+</ParamField>
+
+<ParamField path="ind_num_trans" type="DECIMAL(1)" default="2">
+  Multiplier to determine transportation allowance eligibility. Employees earning less than (SMLV × ind_num_trans) receive transportation allowance.
+  
+  **Constraint**: `ind_num_trans > 0 AND ind_num_trans < 4`
+  
+  Typical value: 2 (employees earning less than 2× minimum wage receive transport allowance)
+</ParamField>
+
+<ParamField path="ano_nomina" type="DECIMAL(4,0)" default="2025">
+  Current year for payroll processing.
+  
+  Example: 2025
+</ParamField>
+
+<ParamField path="mes_nomina" type="DECIMAL(2)" required>
+  Current month for payroll processing (1-12). Foreign key to tab_meses.
+  
+  **Constraint**: `mes_nomina >= 1 AND mes_nomina <= 12`
+</ParamField>
+
+<ParamField path="val_por_intces" type="DECIMAL(2,0)" default="12">
+  Interest percentage on severance payments (Intereses a las Cesantías).
+  
+  Standard Colombian value: 12%
+</ParamField>
+
+<ParamField path="num_diasmes" type="DECIMAL(2,0)" default="30">
+  Number of days per fiscal month for payroll calculations.
+  
+  Standard value: 30 days
+</ParamField>
+
+<ParamField path="id_concep_sb" type="DECIMAL(2,0)" required>
+  Foreign key to tab_conceptos identifying the "Salario Básico" (Basic Salary) concept.
+  
+  Typical value: 1
+</ParamField>
+
+<ParamField path="id_concep_at" type="DECIMAL(2,0)" required>
+  Foreign key to tab_conceptos identifying the "Auxilio de Transporte" (Transportation Allowance) concept.
+  
+  Typical value: 2
+</ParamField>
+
+## Constraints
+
+### Primary Key
+- **id_empresa**: Unique company identifier
+
+### Foreign Keys
+- **mes_nomina** → tab_meses(id_mes)
+- **id_concep_sb** → tab_conceptos(id_concepto) - Basic salary concept
+- **id_concep_at** → tab_conceptos(id_concepto) - Transportation concept
+
+### Check Constraints
+- **nom_empresa**: Minimum 5 characters
+- **ind_perio_pago**: Must be 'Q' or 'M'
+- **val_smlv**: Must be greater than 0
+- **val_auxtrans**: Must be greater than 0 and less than SMLV
+- **ind_num_trans**: Must be between 1 and 3
+- **mes_nomina**: Must be between 1 and 12
+
+### Default Values
+- **ind_perio_pago**: 'Q' (quincenal)
+- **ind_num_trans**: 2
+- **ano_nomina**: 2025
+- **val_por_intces**: 12
+- **num_diasmes**: 30
+
+## Sample Data
+
+```sql
+INSERT INTO tab_pmtros VALUES(
+    123456,                    -- id_empresa
+    'EMPRESA LA COSITA RICA',  -- nom_empresa
+    'Q',                       -- ind_perio_pago (quincenal)
+    1423500,                   -- val_smlv (2025 minimum wage)
+    200000,                    -- val_auxtrans (2025 transport allowance)
+    2,                         -- ind_num_trans
+    2025,                      -- ano_nomina
+    1,                         -- mes_nomina (enero)
+    12,                        -- val_por_intces (12%)
+    30,                        -- num_diasmes
+    1,                         -- id_concep_sb (Salario Básico)
+    2                          -- id_concep_at (Auxilio de Transporte)
+);
+```
+
+## Colombian Legal Requirements
+
+### SMLV (Salario Mínimo Legal Vigente)
+The legal minimum wage is set annually by the Colombian government. Values by year:
+
+| Year | SMLV (COP) |
+|------|------------|
+| 2025 | 1,423,500 |
+| 2024 | 1,300,000 |
+| 2023 | 1,160,000 |
+
+### Auxilio de Transporte
+Transportation allowance is also set annually:
+
+| Year | Amount (COP) |
+|------|-------------|
+| 2025 | 200,000 |
+| 2024 | 162,000 |
+| 2023 | 140,000 |
+
+### Transportation Allowance Eligibility
+Employees earning less than 2× SMLV (ind_num_trans = 2) are eligible:
+- 2025 threshold: 2,847,000 COP (1,423,500 × 2)
+- If salary < threshold → receives auxilio de transporte
+- If salary >= threshold → does not receive auxilio
+
+## Usage Examples
+
+### Get Current Payroll Parameters
+
+```sql
+SELECT p.*, m.nom_mes
+FROM tab_pmtros p
+JOIN tab_meses m ON p.mes_nomina = m.id_mes
+WHERE p.id_empresa = 123456;
+```
+
+### Update Current Month
+
+```sql
+UPDATE tab_pmtros
+SET mes_nomina = 2
+WHERE id_empresa = 123456;
+```
+
+### Update Annual Values (New Year)
+
+```sql
+UPDATE tab_pmtros
+SET val_smlv = 1500000,      -- New minimum wage
+    val_auxtrans = 210000,    -- New transport allowance
+    ano_nomina = 2026,        -- New year
+    mes_nomina = 1            -- Reset to January
+WHERE id_empresa = 123456;
+```
+
+### Check Transport Eligibility Threshold
+
+```sql
+SELECT val_smlv * ind_num_trans as threshold_transporte
+FROM tab_pmtros
+WHERE id_empresa = 123456;
+```
+
+### Get Concept Definitions
+
+```sql
+SELECT 
+    p.id_empresa,
+    p.nom_empresa,
+    c1.nom_concepto as concepto_salario,
+    c2.nom_concepto as concepto_transporte
+FROM tab_pmtros p
+JOIN tab_conceptos c1 ON p.id_concep_sb = c1.id_concepto
+JOIN tab_conceptos c2 ON p.id_concep_at = c2.id_concepto
+WHERE p.id_empresa = 123456;
+```
+
+## Configuration Guide
+
+### Initial Setup
+
+1. **Insert company parameters**:
+   ```sql
+   INSERT INTO tab_pmtros VALUES(
+       [company_id], [company_name], 'Q',
+       [current_smlv], [current_auxtrans], 2,
+       [current_year], [current_month], 12, 30, 1, 2
+   );
+   ```
+
+2. **Verify configuration**:
+   ```sql
+   SELECT * FROM tab_pmtros;
+   ```
+
+### Monthly Updates
+
+At the start of each month:
+```sql
+UPDATE tab_pmtros
+SET mes_nomina = mes_nomina + 1
+WHERE id_empresa = [your_company_id];
+```
+
+### Annual Updates
+
+At the start of each year:
+```sql
+UPDATE tab_pmtros
+SET ano_nomina = [new_year],
+    mes_nomina = 1,
+    val_smlv = [new_minimum_wage],
+    val_auxtrans = [new_transport_allowance]
+WHERE id_empresa = [your_company_id];
+```
+
+## Notes
+
+<Warning>
+  The transportation allowance (val_auxtrans) must always be less than the minimum wage (val_smlv). The database enforces this with a CHECK constraint.
+</Warning>
+
+<Info>
+  The num_diasmes value of 30 is used for standardized payroll calculations, regardless of the actual number of days in a calendar month.
+</Info>
+
+<Note>
+  Interest on severance (val_por_intces) is fixed at 12% per Colombian labor law and should not be changed unless regulations are updated.
+</Note>

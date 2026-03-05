@@ -1,0 +1,443 @@
+---
+title: "Employee Management Guide"
+description: "Complete guide to managing employees from creation through payroll processing"
+---
+
+## Overview
+
+Employee management in NominaSoft covers the complete lifecycle from initial registration through payroll calculation. The system stores employee data in `tab_emplea` and provides CRUD functions for all operations.
+
+## Employee Data Structure
+
+The `tab_emplea` table contains comprehensive employee information organized into three categories:
+
+### Basic Information
+
+| Field | Type | Description | Constraints |
+|-------|------|-------------|-------------|
+| `id_emplea` | DECIMAL(10) | Unique employee identifier | Primary key, auto-generated |
+| `nom_emplea` | VARCHAR | Employee first name | ≥ 3 characters |
+| `ape_emplea` | VARCHAR | Employee last name | ≥ 2 characters |
+| `ind_genero` | BOOLEAN | Gender indicator | TRUE = Female, FALSE = Male |
+| `dir_emplea` | VARCHAR | Home address | ≥ 5 characters |
+| `tel_emplea` | DECIMAL(10,0) | Phone number | 10-digit number |
+| `ind_estrato` | DECIMAL(1) | Socioeconomic stratum | 1-6 |
+
+### Personal Information
+
+| Field | Type | Description | Constraints |
+|-------|------|-------------|-------------|
+| `ind_est_civil` | DECIMAL(1) | Civil status | 0=Single, 1=Married, 2=Divorced, 3=Widowed, 4=Other |
+| `num_hijos` | DECIMAL(1,0) | Number of children | ≥ 0, whole numbers only |
+| `val_tipo_sangre` | VARCHAR | Blood type | e.g., A+, O-, AB+ |
+| `val_edad` | DECIMAL(2,0) | Age | ≥ 16 years |
+
+### Labor Information
+
+| Field | Type | Description | Constraints |
+|-------|------|-------------|-------------|
+| `id_cargo` | DECIMAL(2,0) | Position/role ID | Foreign key to `tab_cargos` |
+| `val_sal_basico` | DECIMAL(8) | Basic monthly salary | ≥ 0 |
+| `fec_ingreso` | DATE | Hire date | Valid date |
+
+<Note>
+The `id_cargo` must reference an existing position in the `tab_cargos` table. If the position doesn't exist, you'll receive SQLSTATE `23503` (Foreign Key Violation).
+</Note>
+
+## Creating Employees
+
+Use the `fun_insert_emplea()` function to register new employees. The function automatically generates the employee ID.
+
+### Function Signature
+
+```sql
+fun_insert_emplea(
+    wnom_emplea,        -- First name
+    wape_emplea,        -- Last name
+    wind_genero,        -- Gender (TRUE/FALSE)
+    wdir_emplea,        -- Address
+    wtel_emplea,        -- Phone number
+    wind_estrato,       -- Stratum (1-6)
+    wind_est_civil,     -- Civil status (0-4)
+    wnum_hijos,         -- Number of children
+    wval_tipo_sangre,   -- Blood type
+    wval_edad,          -- Age
+    wid_cargo,          -- Position ID
+    wval_sal_basico,    -- Basic salary
+    wfec_ingreso        -- Hire date
+)
+```
+
+### Example: Creating an Employee
+
+<Steps>
+  <Step title="Verify position exists">
+    Before creating an employee, ensure the position exists:
+    ```sql
+    SELECT * FROM tab_cargos WHERE id_cargo = 9;
+    ```
+  </Step>
+  
+  <Step title="Call insert function">
+    ```sql
+    SELECT fun_insert_emplea(
+        'Maria Camila',           -- First name
+        'Perez Barrera',          -- Last name
+        TRUE,                     -- Female
+        'Calle 138 Carrera 54',   -- Address
+        3102454737,               -- Phone
+        5,                        -- Stratum 5
+        0,                        -- Single
+        0,                        -- No children
+        'A+',                     -- Blood type A+
+        25,                       -- 25 years old
+        3,                        -- Position ID 3 (Gerente Comercial)
+        8000000,                  -- $8,000,000 monthly salary
+        '2024-10-01'              -- Hire date
+    );
+    ```
+  </Step>
+  
+  <Step title="Verify insertion">
+    ```sql
+    SELECT id_emplea, nom_emplea, ape_emplea, val_sal_basico 
+    FROM tab_emplea 
+    ORDER BY id_emplea DESC 
+    LIMIT 1;
+    ```
+  </Step>
+</Steps>
+
+### ID Generation Logic
+
+The system automatically generates sequential employee IDs:
+
+```sql
+id_emplea = (SELECT COALESCE(MAX(id_emplea), 0) + 1 FROM tab_emplea)
+```
+
+This ensures:
+- First employee gets ID 1
+- Each subsequent employee gets the next available number
+- No ID conflicts or duplicates
+
+<Warning>
+Employee IDs are auto-generated. **Do not** manually specify ID values when inserting employees.
+</Warning>
+
+## Updating Employee Information
+
+The `fun_update_emplea()` function allows modification of all employee fields except the ID.
+
+### Common Update Scenarios
+
+<Accordion title="Salary Adjustment">
+  Update an employee's basic salary (e.g., for annual raise):
+  
+  ```sql
+  SELECT fun_update_emplea(
+      1032505813,              -- Employee ID (existing)
+      'Laura Juliana',         -- Keep same name
+      'Perez Barrera',         -- Keep same last name
+      TRUE,                    -- Keep same gender
+      'Calle 138 Carrera 54',  -- Keep same address
+      3102454737,              -- Keep same phone
+      5,                       -- Keep same stratum
+      0,                       -- Keep same civil status
+      0,                       -- Keep same children count
+      'A+',                    -- Keep same blood type
+      26,                      -- Updated age
+      3,                       -- Keep same position
+      8500000,                 -- NEW: Increased salary
+      '2024-10-01'             -- Keep same hire date
+  );
+  ```
+</Accordion>
+
+<Accordion title="Position Change (Promotion)">
+  Update employee's position when promoted:
+  
+  ```sql
+  SELECT fun_update_emplea(
+      1015000002,              -- Employee ID
+      'Juan Pablo',
+      'Lopez Bobito',
+      FALSE,
+      'Piedecuesta',
+      3104444444,
+      4,
+      0,
+      1,
+      'A+',
+      18,
+      11,                      -- NEW: Promoted to Backend Senior (was 12)
+      6000000,                 -- NEW: Increased salary for promotion
+      '2024-01-01'
+  );
+  ```
+</Accordion>
+
+<Accordion title="Contact Information Update">
+  Update address and phone number:
+  
+  ```sql
+  SELECT fun_update_emplea(
+      1067062169,
+      'Paula Sofia',
+      'Perez Moscoso',
+      TRUE,
+      'Nueva Direccion Calle 45',  -- NEW: Updated address
+      3209876543,                  -- NEW: Updated phone
+      4,
+      0,
+      0,
+      'O+',
+      17,                          -- Updated age
+      8,
+      6500000,
+      '2024-01-01'
+  );
+  ```
+</Accordion>
+
+### Update Implementation
+
+The function updates all fields for the specified employee:
+
+```sql
+UPDATE tab_emplea SET
+    nom_emplea = wnom_emplea, 
+    ape_emplea = wape_emplea, 
+    ind_genero = wind_genero, 
+    dir_emplea = wdir_emplea, 
+    tel_emplea = wtel_emplea, 
+    ind_estrato = wind_estrato, 
+    ind_est_civil = wind_est_civil, 
+    num_hijos = wnum_hijos, 
+    val_tipo_sangre = wval_tipo_sangre, 
+    val_edad = wval_edad, 
+    id_cargo = wid_cargo, 
+    val_sal_basico = wval_sal_basico, 
+    fec_ingreso = wfec_ingreso 
+WHERE id_emplea = wid_emplea;
+```
+
+<Note>
+You must provide **all** employee fields when updating, even if only changing one value. The function replaces all fields with the provided values.
+</Note>
+
+## Deleting Employees
+
+Use `fun_delete_emplea()` to remove employee records. This is typically used for:
+- Employees who never actually started
+- Test records
+- Data cleanup
+
+<Warning>
+Deleting an employee will **cascade delete** all related records:
+- Payroll records in `tab_nomina`
+- Novelty records in `tab_novedades`
+
+This action is **irreversible**. For employees who have left the company but have payroll history, consider marking them inactive instead of deleting.
+</Warning>
+
+### Deletion Function
+
+```sql
+SELECT fun_delete_emplea(employee_id);
+```
+
+### Example: Delete Employee
+
+```sql
+-- Delete employee with ID 1015000008
+SELECT fun_delete_emplea(1015000008);
+```
+
+### Cascade Deletion Behavior
+
+Due to foreign key constraints with `ON DELETE CASCADE`, deleting an employee automatically removes:
+
+```sql
+-- All payroll records for this employee
+DELETE FROM tab_nomina WHERE id_emplea = employee_id;
+
+-- All novelty records for this employee  
+DELETE FROM tab_novedades WHERE id_emplea = employee_id;
+
+-- Finally, the employee record
+DELETE FROM tab_emplea WHERE id_emplea = employee_id;
+```
+
+## Querying Employee Information
+
+### View All Employees with Position Names
+
+```sql
+SELECT 
+    e.id_emplea,
+    e.nom_emplea,
+    e.ape_emplea,
+    c.nom_cargo,
+    e.val_sal_basico,
+    e.fec_ingreso
+FROM tab_emplea e
+INNER JOIN tab_cargos c ON e.id_cargo = c.id_cargo
+ORDER BY e.ape_emplea, e.nom_emplea;
+```
+
+### Find Employees by Salary Range
+
+```sql
+SELECT 
+    id_emplea,
+    nom_emplea || ' ' || ape_emplea AS nombre_completo,
+    val_sal_basico
+FROM tab_emplea
+WHERE val_sal_basico BETWEEN 5000000 AND 8000000
+ORDER BY val_sal_basico DESC;
+```
+
+### Check Transportation Subsidy Eligibility
+
+```sql
+SELECT 
+    e.id_emplea,
+    e.nom_emplea,
+    e.ape_emplea,
+    e.val_sal_basico,
+    p.val_smlv,
+    p.ind_num_trans,
+    (p.val_smlv * p.ind_num_trans) AS threshold,
+    CASE 
+        WHEN e.val_sal_basico <= (p.val_smlv * p.ind_num_trans) 
+        THEN 'YES' 
+        ELSE 'NO' 
+    END AS eligible_for_transport
+FROM tab_emplea e
+CROSS JOIN tab_pmtros p
+ORDER BY e.val_sal_basico;
+```
+
+## Employee-to-Payroll Integration
+
+When payroll is calculated, the system processes each employee:
+
+<Steps>
+  <Step title="Employee iteration">
+    The `fun_act_nomina()` function opens a cursor to iterate through all employees:
+    ```sql
+    wquery_empl = 'SELECT a.id_emplea, a.nom_emplea, a.ape_emplea, 
+                         a.val_sal_basico FROM tab_emplea a';
+    OPEN wcur_emplea FOR EXECUTE wquery_empl;
+    ```
+  </Step>
+  
+  <Step title="Salary calculation per employee">
+    For each employee, the system:
+    - Retrieves their `val_sal_basico` (basic salary)
+    - Calculates prorated amount based on payment period
+    - Determines transportation subsidy eligibility
+    - Applies percentage-based deductions (EPS, AFP)
+  </Step>
+  
+  <Step title="Record generation">
+    Creates multiple `tab_nomina` records for each employee:
+    - One record for basic salary
+    - One record for transportation (if eligible)
+    - One record for each deduction (EPS, AFP, etc.)
+    - Additional records for any novelties (overtime, bonuses)
+  </Step>
+</Steps>
+
+### Payroll Impact of Employee Changes
+
+| Employee Change | Payroll Impact |
+|----------------|----------------|
+| Salary increase | Affects basic salary and percentage-based deductions (EPS, AFP) |
+| Salary decrease | May trigger transportation subsidy eligibility |
+| Position change | No direct impact (unless accompanied by salary change) |
+| Hire date | No impact on current payroll (historical reference only) |
+| Deletion | Removes all historical payroll records (cascading delete) |
+
+## Validation and Constraints
+
+The employee table enforces several data quality constraints:
+
+### Name Validation
+
+```sql
+CHECK (TRIM(nom_emplea) != '' AND LENGTH(nom_emplea) >= 3)
+CHECK (TRIM(ape_emplea) != '' AND LENGTH(ape_emplea) >= 2)
+```
+
+- Names cannot be empty or just whitespace
+- First name must be at least 3 characters
+- Last name must be at least 2 characters
+
+### Numeric Validations
+
+```sql
+CHECK (tel_emplea = FLOOR(tel_emplea))  -- No decimals in phone
+CHECK (ind_estrato BETWEEN 1 AND 6)     -- Valid stratum range
+CHECK (ind_est_civil BETWEEN 0 AND 4)   -- Valid civil status
+CHECK (num_hijos >= 0 AND num_hijos = FLOOR(num_hijos))  -- Whole numbers
+CHECK (val_edad >= 16)                  -- Minimum working age
+CHECK (val_sal_basico >= 0)             -- Non-negative salary
+```
+
+### Referential Integrity
+
+```sql
+FOREGN KEY (id_cargo) REFERENCES tab_cargos(id_cargo) 
+    ON DELETE CASCADE 
+    ON UPDATE CASCADE
+```
+
+This ensures:
+- Every employee has a valid position
+- If a position is deleted, associated employees are also deleted (or blocked if they exist)
+- Position ID updates automatically propagate to employees
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Salary Updates">
+    - Always verify the current salary before updating
+    - Document the reason for salary changes
+    - Consider the payroll period when applying changes
+    - Update immediately after period closes to avoid mid-period confusion
+  </Accordion>
+  
+  <Accordion title="Employee Deletion">
+    - **Never delete** employees with payroll history
+    - Instead, create an inactive status indicator if needed
+    - Only delete test records or employees who never started
+    - Always backup data before performing deletions
+  </Accordion>
+  
+  <Accordion title="Data Quality">
+    - Validate phone numbers are 10 digits
+    - Use consistent blood type format (e.g., A+, O-, AB+)
+    - Verify position exists before assigning
+    - Keep ages updated (or calculate from birth date if implemented)
+  </Accordion>
+  
+  <Accordion title="Transportation Subsidy">
+    - Monitor salary changes near the SMLV threshold
+    - Employees just below threshold qualify for extra subsidy
+    - Small salary increase could reduce net pay if subsidy is lost
+    - Current threshold: 2 × SMLV (configurable in `tab_pmtros`)
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payroll Calculation" icon="calculator" href="/guides/payroll-calculation">
+    Learn how employee data is used in payroll processing
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Understand error codes for employee operations
+  </Card>
+</CardGroup>

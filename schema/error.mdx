@@ -1,0 +1,368 @@
+---
+title: tab_error Table
+description: PostgreSQL error codes catalog (SQLSTATE reference)
+---
+
+## Overview
+
+The `tab_error` table is a comprehensive reference catalog of PostgreSQL SQLSTATE error codes with Spanish descriptions. It provides human-readable explanations for database errors, useful for error handling, logging, and user-friendly error messages.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS tab_error(
+    cod_error       VARCHAR     NOT NULL,
+    name_error      VARCHAR     NOT NULL,
+    PRIMARY KEY (cod_error)
+);
+```
+
+## Column Reference
+
+<ParamField path="cod_error" type="VARCHAR" required>
+  PostgreSQL SQLSTATE error code (5 characters). Primary key.
+  
+  Examples: '00000', '23505', '42P01', 'P0001'
+</ParamField>
+
+<ParamField path="name_error" type="VARCHAR" required>
+  Spanish description of the error with English name.
+  
+  Format: "English Name: Spanish description."
+  
+  Example: "Unique Violation: Violación de restricción única."
+</ParamField>
+
+## Constraints
+
+### Primary Key
+- **cod_error**: Unique SQLSTATE code
+
+### Not Null
+- Both columns are required
+
+## Error Code Classes
+
+PostgreSQL error codes are organized by class (first 2 characters):
+
+### Class 00 - Successful Completion
+| Code | Description |
+|------|-------------|
+| 00000 | Successful Completion: Operación ejecutada sin errores |
+
+### Class 01 - Warnings
+| Code | Description |
+|------|-------------|
+| 01000 | Warning: Advertencia general |
+| 0100C | Dynamic result sets returned |
+| 01004 | String data right truncation |
+| 01P01 | Deprecated feature |
+
+### Class 02 - No Data
+| Code | Description |
+|------|-------------|
+| 02000 | No Data: No se encontraron filas o datos |
+| 02001 | No additional dynamic result sets returned |
+
+### Class 08 - Connection Exception
+| Code | Description |
+|------|-------------|
+| 08000 | Connection Exception |
+| 08003 | Connection does not exist |
+| 08006 | Connection failure |
+| 08001 | SQL client unable to establish connection |
+| 08004 | SQL server rejected connection |
+| 08P01 | Protocol violation |
+
+### Class 22 - Data Exception
+| Code | Description |
+|------|-------------|
+| 22000 | Data Exception |
+| 22012 | Division By Zero |
+| 22001 | String Data Right Truncation |
+| 22003 | Numeric Value Out Of Range |
+| 22007 | Invalid Datetime Format |
+| 22P02 | Invalid Text Representation |
+
+### Class 23 - Integrity Constraint Violation
+| Code | Description |
+|------|-------------|
+| 23000 | Integrity Constraint Violation |
+| 23502 | Not Null Violation: Columna no permite nulos |
+| 23503 | Foreign Key Violation: Violación de clave foránea |
+| 23505 | Unique Violation: Violación de restricción única |
+| 23514 | Check Violation: Violación de restricción CHECK |
+| 23P01 | Exclusion Violation |
+
+### Class 40 - Transaction Rollback
+| Code | Description |
+|------|-------------|
+| 40000 | Transaction Rollback |
+| 40001 | Serialization Failure |
+| 40P01 | Deadlock Detected: Se detectó un deadlock |
+
+### Class 42 - Syntax Error or Access Rule Violation
+| Code | Description |
+|------|-------------|
+| 42000 | Syntax Error or Access Rule Violation |
+| 42601 | Syntax Error |
+| 42501 | Insufficient Privilege: Privilegios insuficientes |
+| 42804 | Datatype Mismatch: Tipos de datos incompatibles |
+| 42P01 | Undefined Table |
+
+### Class 53 - Insufficient Resources
+| Code | Description |
+|------|-------------|
+| 53000 | Insufficient Resources |
+| 53100 | Disk Full |
+| 53200 | Out Of Memory: Memoria insuficiente |
+| 53300 | Too Many Connections |
+
+### Class P0 - PL/pgSQL Error
+| Code | Description |
+|------|-------------|
+| P0000 | PL/pgSQL Error |
+| P0001 | Raise Exception: Se ejecutó RAISE EXCEPTION |
+| P0002 | No Data Found: No se encontraron datos en PL/pgSQL |
+| P0003 | Too Many Rows |
+| P0004 | Assert Failure |
+
+### Class XX - Internal Error
+| Code | Description |
+|------|-------------|
+| XX000 | Internal Error: Error interno en PostgreSQL |
+| XX001 | Data Corrupted: Datos corruptos |
+| XX002 | Index Corrupted: Índice corrupto |
+
+## Sample Data
+
+### Common Application Errors
+
+```sql
+-- Success
+INSERT INTO tab_error VALUES ('00000', 'Successful Completion: Operación ejecutada sin errores.');
+
+-- Constraint violations (most common in payroll system)
+INSERT INTO tab_error VALUES ('23502', 'Not Null Violation: Columna no permite nulos.');
+INSERT INTO tab_error VALUES ('23503', 'Foreign Key Violation: Violación de clave foránea.');
+INSERT INTO tab_error VALUES ('23505', 'Unique Violation: Violación de restricción única.');
+INSERT INTO tab_error VALUES ('23514', 'Check Violation: Violación de restricción CHECK.');
+
+-- Data exceptions
+INSERT INTO tab_error VALUES ('22012', 'Division By Zero: División por cero.');
+INSERT INTO tab_error VALUES ('22003', 'Numeric Value Out Of Range: Valor numérico fuera de rango.');
+INSERT INTO tab_error VALUES ('22001', 'String Data Right Truncation: Cadena truncada a la derecha.');
+
+-- Syntax and access errors
+INSERT INTO tab_error VALUES ('42601', 'Syntax Error: Error de sintaxis.');
+INSERT INTO tab_error VALUES ('42501', 'Insufficient Privilege: Privilegios insuficientes.');
+
+-- PL/pgSQL errors
+INSERT INTO tab_error VALUES ('P0001', 'Raise Exception: Se ejecutó RAISE EXCEPTION.');
+INSERT INTO tab_error VALUES ('P0002', 'No Data Found: No se encontraron datos en PL/pgSQL.');
+```
+
+## Usage Examples
+
+### Look Up Error by Code
+
+```sql
+SELECT name_error
+FROM tab_error
+WHERE cod_error = '23505';
+```
+
+### Search Errors by Description
+
+```sql
+SELECT cod_error, name_error
+FROM tab_error
+WHERE name_error ILIKE '%violación%'
+ORDER BY cod_error;
+```
+
+### List All Constraint Violation Errors
+
+```sql
+SELECT cod_error, name_error
+FROM tab_error
+WHERE cod_error LIKE '23%'
+ORDER BY cod_error;
+```
+
+### List All PL/pgSQL Errors
+
+```sql
+SELECT cod_error, name_error
+FROM tab_error
+WHERE cod_error LIKE 'P0%'
+ORDER BY cod_error;
+```
+
+### Create Error Handling Function
+
+```sql
+CREATE OR REPLACE FUNCTION get_error_description(error_code VARCHAR)
+RETURNS VARCHAR AS $$
+DECLARE
+    error_desc VARCHAR;
+BEGIN
+    SELECT name_error INTO error_desc
+    FROM tab_error
+    WHERE cod_error = error_code;
+    
+    RETURN COALESCE(error_desc, 'Error desconocido: ' || error_code);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+## Application Integration
+
+### Error Handling in Application Code
+
+```python
+# Python example
+import psycopg2
+
+def insert_employee(conn, employee_data):
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO tab_emplea VALUES (%s, %s, ...)",
+            employee_data
+        )
+        conn.commit()
+    except psycopg2.Error as e:
+        sqlstate = e.pgcode
+        
+        # Look up user-friendly error message
+        cursor.execute(
+            "SELECT name_error FROM tab_error WHERE cod_error = %s",
+            (sqlstate,)
+        )
+        error_desc = cursor.fetchone()
+        
+        if error_desc:
+            print(f"Error: {error_desc[0]}")
+        else:
+            print(f"Error code: {sqlstate}")
+        
+        conn.rollback()
+```
+
+### Logging Errors
+
+```sql
+-- Create error log table
+CREATE TABLE error_log (
+    log_id SERIAL PRIMARY KEY,
+    error_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    error_code VARCHAR,
+    error_message TEXT,
+    user_name VARCHAR,
+    query_text TEXT
+);
+
+-- Log error with description
+INSERT INTO error_log (error_code, error_message, user_name)
+SELECT 
+    '23505',
+    name_error,
+    current_user
+FROM tab_error
+WHERE cod_error = '23505';
+```
+
+## Common Payroll System Errors
+
+### Constraint Violations
+| Error Code | Scenario | Resolution |
+|------------|----------|------------|
+| 23502 | Not Null Violation | Employee name is empty | Ensure all required fields are filled |
+| 23503 | Foreign Key Violation | Invalid id_cargo reference | Verify position exists in tab_cargos |
+| 23505 | Unique Violation | Duplicate employee ID | Check for existing employee |
+| 23514 | Check Violation | Salary < 0 or age < 16 | Validate input data |
+
+### Data Exceptions
+| Error Code | Scenario | Resolution |
+|------------|----------|------------|
+| 22003 | Numeric Out of Range | Salary exceeds DECIMAL(8) | Use larger numeric type or validate |
+| 22001 | String Truncation | Name too long for VARCHAR | Increase column size or truncate |
+| 22007 | Invalid Date Format | Wrong fec_ingreso format | Use ISO format: 'YYYY-MM-DD' |
+
+## Complete Error Classes
+
+The table includes all PostgreSQL error classes:
+- **00**: Successful Completion
+- **01**: Warning
+- **02**: No Data
+- **03**: SQL Statement Not Yet Complete
+- **08**: Connection Exception
+- **09**: Triggered Action Exception
+- **0A**: Feature Not Supported
+- **0B**: Invalid Transaction Initiation
+- **0F**: Locator Exception
+- **0L**: Invalid Grantor
+- **0P**: Invalid Role Specification
+- **0Z**: Diagnostics Exception
+- **20**: Case Not Found
+- **21**: Cardinality Violation
+- **22**: Data Exception
+- **23**: Integrity Constraint Violation
+- **24**: Invalid Cursor State
+- **25**: Invalid Transaction State
+- **26**: Invalid SQL Statement Name
+- **27**: Triggered Data Change Violation
+- **28**: Invalid Authorization Specification
+- **2B**: Dependent Privilege Descriptors Still Exist
+- **2D**: Invalid Transaction Termination
+- **2F**: SQL Routine Exception
+- **34**: Invalid Cursor Name
+- **38**: External Routine Exception
+- **39**: External Routine Invocation Exception
+- **3B**: Savepoint Exception
+- **3D**: Invalid Catalog Name
+- **3F**: Invalid Schema Name
+- **40**: Transaction Rollback
+- **42**: Syntax Error or Access Rule Violation
+- **44**: WITH CHECK OPTION Violation
+- **53**: Insufficient Resources
+- **54**: Program Limit Exceeded
+- **55**: Object Not In Prerequisite State
+- **57**: Operator Intervention
+- **58**: System Error
+- **F0**: Configuration File Error
+- **HV**: Foreign Data Wrapper Error
+- **P0**: PL/pgSQL Error
+- **XX**: Internal Error
+
+## Notes
+
+<Info>
+  This table contains 336 error codes covering all PostgreSQL SQLSTATE values. It serves as a comprehensive reference for error handling in the NominaSoft application.
+</Info>
+
+<Note>
+  Error descriptions are provided in both English and Spanish, making them suitable for bilingual applications or Spanish-speaking users.
+</Note>
+
+<Warning>
+  The table is a reference catalog and should be populated once during database initialization. Do not modify existing error codes as they follow the PostgreSQL standard.
+</Warning>
+
+## Best Practices
+
+<Check>
+  - Use this table to provide user-friendly error messages
+  - Log SQLSTATE codes along with timestamps for debugging
+  - Create wrapper functions to translate error codes automatically
+  - Include error_code lookups in stored procedures
+  - Display Spanish descriptions to end users
+  - Keep English names for developer documentation
+</Check>
+
+## Related Resources
+
+- [PostgreSQL Error Codes Documentation](https://www.postgresql.org/docs/current/errcodes-appendix.html)
+- SQL Standard SQLSTATE codes
+- Application error handling best practices

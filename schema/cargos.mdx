@@ -1,0 +1,194 @@
+---
+title: tab_cargos Table
+description: Employee positions and roles catalog
+---
+
+## Overview
+
+The `tab_cargos` table stores all available employee positions and roles within the company. Each position has a unique identifier and descriptive name.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS tab_cargos
+(
+    id_cargo        DECIMAL(2,0)    NOT NULL,
+    nom_cargo       VARCHAR         NOT NULL    CHECK(LENGTH(nom_cargo)>=5),
+    PRIMARY KEY(id_cargo)
+);
+```
+
+## Column Reference
+
+<ParamField path="id_cargo" type="DECIMAL(2,0)" required>
+  Unique identifier for each position (01-99). Primary key.
+</ParamField>
+
+<ParamField path="nom_cargo" type="VARCHAR" required>
+  Name of the position/role. Must be at least 5 characters long.
+  
+  **Constraint**: `LENGTH(nom_cargo) >= 5`
+</ParamField>
+
+## Constraints
+
+### Primary Key
+- **id_cargo**: Unique position identifier
+
+### Check Constraints
+- **nom_cargo**: Must be at least 5 characters
+
+## Sample Data
+
+The system includes a comprehensive list of positions across different departments:
+
+### Management Positions
+
+```sql
+INSERT INTO tab_cargos VALUES(1,  'Gerente General');
+INSERT INTO tab_cargos VALUES(2,  'Secretaria General');
+INSERT INTO tab_cargos VALUES(3,  'Gerente Comercial');
+INSERT INTO tab_cargos VALUES(4,  'Gerente Financiero');
+INSERT INTO tab_cargos VALUES(5,  'Gerente de TI');
+INSERT INTO tab_cargos VALUES(6,  'Gerente de Mercadeo');
+```
+
+### IT Department
+
+```sql
+INSERT INTO tab_cargos VALUES(7,  'Director de Seguridad de la Información');
+INSERT INTO tab_cargos VALUES(8,  'Scrum Master');
+INSERT INTO tab_cargos VALUES(9,  'Desarrollador Front Senior');
+INSERT INTO tab_cargos VALUES(10, 'Desarrollador Front Junior');
+INSERT INTO tab_cargos VALUES(11, 'Desarrollador Back Senior');
+INSERT INTO tab_cargos VALUES(12, 'Desarrollador Back Junior');
+INSERT INTO tab_cargos VALUES(13, 'Diseñador');
+INSERT INTO tab_cargos VALUES(14, 'Tester');
+INSERT INTO tab_cargos VALUES(15, 'Documentador');
+```
+
+### Support and Operations
+
+```sql
+INSERT INTO tab_cargos VALUES(16, 'Servicios Generales');
+INSERT INTO tab_cargos VALUES(17, 'Mensajero');
+INSERT INTO tab_cargos VALUES(20, 'Vigilante');
+```
+
+### Accounting Department
+
+```sql
+INSERT INTO tab_cargos VALUES(18, 'Auxiliar Contable');
+INSERT INTO tab_cargos VALUES(19, 'Director Contable');
+```
+
+## Position Categories
+
+### Executive Management (IDs 1-6)
+- Gerente General
+- Gerente Comercial
+- Gerente Financiero
+- Gerente de TI
+- Gerente de Mercadeo
+- Secretaria General
+
+### IT and Development (IDs 7-15)
+- Director de Seguridad de la Información
+- Scrum Master
+- Desarrollador Front Senior/Junior
+- Desarrollador Back Senior/Junior
+- Diseñador
+- Tester
+- Documentador
+
+### Accounting (IDs 18-19)
+- Director Contable
+- Auxiliar Contable
+
+### Operations (IDs 16, 17, 20)
+- Servicios Generales
+- Mensajero
+- Vigilante
+
+## Usage Examples
+
+### List All Positions
+
+```sql
+SELECT id_cargo, nom_cargo
+FROM tab_cargos
+ORDER BY nom_cargo;
+```
+
+### Find IT Positions
+
+```sql
+SELECT id_cargo, nom_cargo
+FROM tab_cargos
+WHERE nom_cargo LIKE '%Desarrollador%' 
+   OR nom_cargo LIKE '%Scrum%'
+   OR nom_cargo LIKE '%Diseñador%'
+   OR nom_cargo LIKE '%Tester%'
+ORDER BY id_cargo;
+```
+
+### Count Employees by Position
+
+```sql
+SELECT c.nom_cargo, COUNT(e.id_emplea) as num_empleados
+FROM tab_cargos c
+LEFT JOIN tab_emplea e ON c.id_cargo = e.id_cargo
+GROUP BY c.id_cargo, c.nom_cargo
+ORDER BY num_empleados DESC;
+```
+
+### Add New Position
+
+```sql
+INSERT INTO tab_cargos VALUES(21, 'Analista de Datos');
+```
+
+## Related Tables
+
+### tab_emplea
+Each employee in `tab_emplea` is assigned to one position through the `id_cargo` foreign key:
+
+```sql
+FOREIGN KEY(id_cargo) REFERENCES tab_cargos(id_cargo) 
+  ON DELETE CASCADE ON UPDATE CASCADE
+```
+
+## Organizational Structure
+
+The positions reflect a typical Colombian software development company structure:
+
+```
+Gerente General (1)
+├── Gerente Comercial (3)
+├── Gerente Financiero (4)
+│   ├── Director Contable (19)
+│   └── Auxiliar Contable (18)
+├── Gerente de TI (5)
+│   ├── Director de Seguridad de la Información (7)
+│   ├── Scrum Master (8)
+│   ├── Desarrolladores (9-12)
+│   ├── Diseñador (13)
+│   ├── Tester (14)
+│   └── Documentador (15)
+├── Gerente de Mercadeo (6)
+├── Secretaria General (2)
+└── Operaciones
+    ├── Servicios Generales (16)
+    ├── Mensajero (17)
+    └── Vigilante (20)
+```
+
+## Notes
+
+<Info>
+  Position IDs are limited to 2 digits (01-99), allowing for up to 99 different positions in the company.
+</Info>
+
+<Warning>
+  Deleting a position will cascade delete all employees assigned to that position due to the `ON DELETE CASCADE` constraint. Ensure positions are not deleted if they have active employees.
+</Warning>

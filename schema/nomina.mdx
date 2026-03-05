@@ -1,0 +1,355 @@
+---
+title: tab_nomina Table
+description: Final payroll calculation results
+---
+
+## Overview
+
+The `tab_nomina` table stores the final calculated payroll results for each employee, concept, and period. This is the output table that consolidates all payroll information including base salary, allowances, overtime, and deductions into individual line items.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS tab_nomina
+(
+    ano_nomina      DECIMAL(4,0)    NOT NULL,
+    mes_nomina      DECIMAL(2)      NOT NULL,
+    per_nomina      DECIMAL(1)      NOT NULL,
+    id_emplea       DECIMAL(10)     NOT NULL,
+    id_concepto     DECIMAL(2)      NOT NULL,
+    val_dias_trab   DECIMAL(2)      NOT NULL    CHECK(val_dias_trab BETWEEN 1 AND 30),
+    val_nomina      DECIMAL(8)      NOT NULL    CHECK (val_nomina >= 0),
+
+    PRIMARY KEY(ano_nomina,mes_nomina,per_nomina,id_emplea,id_concepto),
+    FOREIGN KEY(id_emplea)      REFERENCES tab_emplea(id_emplea)        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(id_concepto)    REFERENCES tab_conceptos(id_concepto)   ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(mes_nomina)     REFERENCES tab_meses(id_mes)            ON DELETE CASCADE ON UPDATE CASCADE
+);
+```
+
+## Column Reference
+
+### Primary Key Components
+
+<ParamField path="ano_nomina" type="DECIMAL(4,0)" required>
+  Payroll year (e.g., 2025). Part of composite primary key.
+</ParamField>
+
+<ParamField path="mes_nomina" type="DECIMAL(2)" required>
+  Payroll month (1-12). Foreign key to tab_meses. Part of composite primary key.
+</ParamField>
+
+<ParamField path="per_nomina" type="DECIMAL(1)" required>
+  Payroll period:
+  - 1: First period (quincena 1 or mensual)
+  - 2: Second period (quincena 2)
+  
+  Part of composite primary key.
+</ParamField>
+
+<ParamField path="id_emplea" type="DECIMAL(10)" required>
+  Employee ID. Foreign key to tab_emplea. Part of composite primary key.
+</ParamField>
+
+<ParamField path="id_concepto" type="DECIMAL(2)" required>
+  Payroll concept ID. Foreign key to tab_conceptos. Part of composite primary key.
+</ParamField>
+
+### Payroll Values
+
+<ParamField path="val_dias_trab" type="DECIMAL(2)" required>
+  Number of days worked in this period (1-30).
+  
+  **Constraint**: `val_dias_trab BETWEEN 1 AND 30`
+</ParamField>
+
+<ParamField path="val_nomina" type="DECIMAL(8)" required>
+  Calculated monetary value for this concept in Colombian Pesos. This is the final amount to be paid or deducted.
+  
+  **Constraint**: `val_nomina >= 0`
+</ParamField>
+
+## Constraints
+
+### Composite Primary Key
+Unique combination of:
+- ano_nomina (year)
+- mes_nomina (month)  
+- per_nomina (period)
+- id_emplea (employee)
+- id_concepto (concept)
+
+This ensures one payroll line per employee per concept per period.
+
+### Foreign Keys
+- **id_emplea** → tab_emplea(id_emplea)
+- **id_concepto** → tab_conceptos(id_concepto)
+- **mes_nomina** → tab_meses(id_mes)
+
+All with ON DELETE CASCADE ON UPDATE CASCADE.
+
+### Check Constraints
+- **val_dias_trab**: Between 1 and 30
+- **val_nomina**: Must be >= 0
+
+## Data Structure
+
+Each employee's payroll is broken down into multiple rows, one per concept:
+
+| Employee | Period | Concept | Value |
+|----------|--------|---------|-------|
+| Juan Pérez | 2025-01-1 | Salario Básico | 3,000,000 |
+| Juan Pérez | 2025-01-1 | Auxilio Transporte | 200,000 |
+| Juan Pérez | 2025-01-1 | Horas Extras | 250,000 |
+| Juan Pérez | 2025-01-1 | EPS (4%) | -120,000 |
+| Juan Pérez | 2025-01-1 | AFP (4%) | -120,000 |
+| Juan Pérez | 2025-01-1 | NETO PAGADO | 3,210,000 |
+
+## Calculation Process
+
+The payroll calculation typically involves:
+
+1. **Base concepts** (from tab_emplea):
+   - Salario Básico (prorated by val_dias_trab)
+   - Auxilio de Transporte (if eligible)
+
+2. **Novelty concepts** (from tab_novedades):
+   - Overtime hours
+   - Bonuses
+   - Loan deductions
+
+3. **Calculated deductions**:
+   - EPS (4% monthly)
+   - AFP (4% monthly)
+
+4. **Net payment**:
+   - Sum all earnings
+   - Subtract all deductions
+   - Store as NETO PAGADO concept
+
+## Usage Examples
+
+### Insert Salary Concept
+
+```sql
+-- Basic salary for 15 days (quincenal)
+INSERT INTO tab_nomina VALUES(
+    2025,           -- year
+    3,              -- March
+    1,              -- first period
+    1032505813,     -- employee ID
+    1,              -- Salario Básico
+    15,             -- days worked
+    4000000         -- calculated amount
+);
+```
+
+### Query Employee Payroll Detail
+
+```sql
+SELECT 
+    e.nom_emplea || ' ' || e.ape_emplea as empleado,
+    c.nom_concepto,
+    c.ind_operacion,
+    n.val_nomina,
+    CASE 
+        WHEN c.ind_operacion THEN '+' 
+        ELSE '-' 
+    END as tipo
+FROM tab_nomina n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025 
+  AND n.mes_nomina = 1 
+  AND n.per_nomina = 1
+  AND n.id_emplea = 1032505813
+ORDER BY c.ind_operacion DESC, c.nom_concepto;
+```
+
+### Calculate Net Payment
+
+```sql
+SELECT 
+    e.nom_emplea || ' ' || e.ape_emplea as empleado,
+    SUM(CASE WHEN c.ind_operacion = TRUE THEN n.val_nomina ELSE 0 END) as devengado,
+    SUM(CASE WHEN c.ind_operacion = FALSE THEN n.val_nomina ELSE 0 END) as deducido,
+    SUM(CASE WHEN c.ind_operacion = TRUE THEN n.val_nomina ELSE -n.val_nomina END) as neto
+FROM tab_nomina n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025 
+  AND n.mes_nomina = 1 
+  AND n.per_nomina = 1
+  AND c.neto_pagado = FALSE  -- Exclude NETO PAGADO line
+GROUP BY e.id_emplea, e.nom_emplea, e.ape_emplea
+ORDER BY neto DESC;
+```
+
+### Payroll Summary Report
+
+```sql
+SELECT 
+    m.nom_mes,
+    n.per_nomina,
+    COUNT(DISTINCT n.id_emplea) as num_empleados,
+    SUM(n.val_nomina) as total_nomina
+FROM tab_nomina n
+JOIN tab_meses m ON n.mes_nomina = m.id_mes
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025
+  AND c.neto_pagado = TRUE  -- Only count net payment lines
+GROUP BY m.id_mes, m.nom_mes, n.per_nomina
+ORDER BY m.id_mes, n.per_nomina;
+```
+
+### Concept Totals by Period
+
+```sql
+SELECT 
+    c.nom_concepto,
+    c.ind_operacion,
+    COUNT(*) as num_empleados,
+    SUM(n.val_nomina) as total
+FROM tab_nomina n
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025 
+  AND n.mes_nomina = 1 
+  AND n.per_nomina = 1
+GROUP BY c.id_concepto, c.nom_concepto, c.ind_operacion
+ORDER BY c.ind_operacion DESC, total DESC;
+```
+
+### Find Highest Paid Employees
+
+```sql
+SELECT 
+    e.id_emplea,
+    e.nom_emplea || ' ' || e.ape_emplea as empleado,
+    c.nom_cargo,
+    n.val_nomina as neto_pagado
+FROM tab_nomina n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+JOIN tab_cargos c ON e.id_cargo = c.id_cargo
+JOIN tab_conceptos co ON n.id_concepto = co.id_concepto
+WHERE n.ano_nomina = 2025 
+  AND n.mes_nomina = 1 
+  AND n.per_nomina = 1
+  AND co.neto_pagado = TRUE
+ORDER BY n.val_nomina DESC
+LIMIT 10;
+```
+
+### Payroll vs Budget Analysis
+
+```sql
+SELECT 
+    m.nom_mes,
+    SUM(CASE WHEN c.ind_operacion = TRUE THEN n.val_nomina ELSE 0 END) as total_devengado,
+    SUM(CASE WHEN c.ind_operacion = FALSE THEN n.val_nomina ELSE 0 END) as total_deducido,
+    SUM(CASE WHEN c.neto_pagado = TRUE THEN n.val_nomina ELSE 0 END) as total_neto
+FROM tab_nomina n
+JOIN tab_meses m ON n.mes_nomina = m.id_mes
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025
+GROUP BY m.id_mes, m.nom_mes
+ORDER BY m.id_mes;
+```
+
+## Payroll Slip Generation
+
+```sql
+-- Generate payroll slip for an employee
+SELECT 
+    e.nom_emplea || ' ' || e.ape_emplea as empleado,
+    e.id_emplea as cedula,
+    c_cargo.nom_cargo as cargo,
+    m.nom_mes || ' ' || n.ano_nomina as periodo,
+    n.per_nomina as quincena,
+    c.nom_concepto as concepto,
+    CASE WHEN c.ind_operacion THEN 'Devengado' ELSE 'Deducción' END as tipo,
+    n.val_nomina as valor
+FROM tab_nomina n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+JOIN tab_cargos c_cargo ON e.id_cargo = c_cargo.id_cargo
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+JOIN tab_meses m ON n.mes_nomina = m.id_mes
+WHERE n.id_emplea = 1032505813
+  AND n.ano_nomina = 2025
+  AND n.mes_nomina = 1
+  AND n.per_nomina = 1
+ORDER BY c.ind_operacion DESC, c.nom_concepto;
+```
+
+## Related Tables
+
+- **tab_emplea**: Employee master data (base salary)
+- **tab_conceptos**: Concept definitions and calculation rules
+- **tab_novedades**: Input novelties that feed calculations
+- **tab_meses**: Month validation and names
+- **tab_pmtros**: System parameters for calculations
+
+## Data Flow
+
+```
+tab_emplea (base salary)
+    ↓
+tab_novedades (novelties) → PAYROLL CALCULATION → tab_nomina (final results)
+    ↓
+tab_conceptos (rules)
+    ↓
+tab_pmtros (parameters)
+```
+
+## Archive and History
+
+<Info>
+  The tab_nomina table serves as the permanent payroll history. Each period's data should be retained for:
+  - Legal compliance (Colombian law requires 10+ years)
+  - Employee inquiries
+  - Tax reporting
+  - Audit trails
+</Info>
+
+## Reporting Considerations
+
+### Grouping by Employee
+To get total per employee, sum all concepts:
+```sql
+GROUP BY ano_nomina, mes_nomina, per_nomina, id_emplea
+```
+
+### Separating Earnings and Deductions
+Use `ind_operacion` from tab_conceptos:
+- TRUE = Earnings (devengados)
+- FALSE = Deductions (deducciones)
+
+### Net Payment
+Either:
+1. Calculate: SUM(earnings) - SUM(deductions)
+2. Query the NETO PAGADO concept directly
+
+## Notes
+
+<Warning>
+  Values in val_nomina should always be positive (>= 0), even for deductions. The concept's ind_operacion flag determines if it's added or subtracted in reports.
+</Warning>
+
+<Note>
+  For quincenal (bi-weekly) payroll, you'll have 2 records per employee per month (per_nomina = 1 and 2). For mensual (monthly), only per_nomina = 1.
+</Note>
+
+<Info>
+  The NETO PAGADO concept (neto_pagado = TRUE) represents the final amount to be paid to the employee and can be used for quick reporting without recalculating.
+</Info>
+
+## Best Practices
+
+<Check>
+  - Generate all concepts for all employees in a single transaction
+  - Validate totals before finalizing payroll
+  - Keep NETO PAGADO concept synchronized with actual calculations
+  - Archive completed payroll periods before processing new ones
+  - Implement approval workflow before inserting into tab_nomina
+  - Create backup before bulk updates or deletions
+  - Index ano_nomina, mes_nomina, per_nomina for faster queries
+</Check>

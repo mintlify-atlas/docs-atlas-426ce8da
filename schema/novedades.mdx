@@ -1,0 +1,302 @@
+---
+title: tab_novedades Table
+description: Payroll novelties and adjustments
+---
+
+## Overview
+
+The `tab_novedades` table records changes and adjustments to employee payroll for a specific period. Novelties represent additional earnings or deductions beyond the standard salary, such as overtime hours, bonuses, loan deductions, and other variable concepts.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS tab_novedades
+(
+--PKs
+    ano_nomina		DECIMAL(4,0)    NOT NULL,
+    mes_nomina		DECIMAL(2)      NOT NULL,
+    per_nomina		DECIMAL(1)      NOT NULL,
+    id_emplea		DECIMAL(10)     NOT NULL,
+    id_concepto		DECIMAL(2)      NOT NULL,
+
+    val_dias_trab  	DECIMAL(2)      NOT NULL 	CHECK(val_dias_trab >= 1 AND val_dias_trab <= 30), 
+    val_horas_trab 	DECIMAL(2)   	NOT NULL 	CHECK(val_horas_trab >= 1 AND val_horas_trab <= 24),
+
+    PRIMARY KEY(ano_nomina,mes_nomina,per_nomina,id_emplea,id_concepto),
+    FOREIGN KEY(id_emplea)      REFERENCES tab_emplea(id_emplea)        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(id_concepto)    REFERENCES tab_conceptos(id_concepto)   ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(mes_nomina)     REFERENCES tab_meses(id_mes)            ON DELETE CASCADE ON UPDATE CASCADE
+);
+```
+
+## Column Reference
+
+### Primary Key Components
+
+<ParamField path="ano_nomina" type="DECIMAL(4,0)" required>
+  Payroll year (e.g., 2025). Part of composite primary key.
+</ParamField>
+
+<ParamField path="mes_nomina" type="DECIMAL(2)" required>
+  Payroll month (1-12). Foreign key to tab_meses. Part of composite primary key.
+</ParamField>
+
+<ParamField path="per_nomina" type="DECIMAL(1)" required>
+  Payroll period within the month:
+  - 1: First period (quincena 1 or mensual)
+  - 2: Second period (quincena 2, if applicable)
+  
+  Part of composite primary key.
+</ParamField>
+
+<ParamField path="id_emplea" type="DECIMAL(10)" required>
+  Employee ID. Foreign key to tab_emplea. Part of composite primary key.
+</ParamField>
+
+<ParamField path="id_concepto" type="DECIMAL(2)" required>
+  Payroll concept ID. Foreign key to tab_conceptos. Part of composite primary key.
+</ParamField>
+
+### Novelty Details
+
+<ParamField path="val_dias_trab" type="DECIMAL(2)" required>
+  Number of days worked or applicable to this novelty (1-30).
+  
+  **Constraint**: `val_dias_trab >= 1 AND val_dias_trab <= 30`
+</ParamField>
+
+<ParamField path="val_horas_trab" type="DECIMAL(2)" required>
+  Number of hours worked or applicable to this novelty (1-24).
+  
+  **Constraint**: `val_horas_trab >= 1 AND val_horas_trab <= 24`
+  
+  Used primarily for overtime calculations.
+</ParamField>
+
+## Constraints
+
+### Composite Primary Key
+Unique combination of:
+- ano_nomina (year)
+- mes_nomina (month)
+- per_nomina (period)
+- id_emplea (employee)
+- id_concepto (concept)
+
+This ensures one novelty record per employee per concept per period.
+
+### Foreign Keys
+- **id_emplea** → tab_emplea(id_emplea)
+- **id_concepto** → tab_conceptos(id_concepto)
+- **mes_nomina** → tab_meses(id_mes)
+
+All with ON DELETE CASCADE ON UPDATE CASCADE.
+
+### Check Constraints
+- **val_dias_trab**: Between 1 and 30
+- **val_horas_trab**: Between 1 and 24
+
+## Sample Data
+
+### January 2025 - First Period (Quincena 1)
+
+```sql
+-- Bonificación (bonus) for employee 91423627
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 91423627, 6, 15, 1);
+
+-- Bonificación for employee 1032505813
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1032505813, 6, 15, 1);
+
+-- Bonificación for employee 1067062169
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1067062169, 6, 15, 1);
+
+-- Horas Extras Diurnas (daytime overtime) - 5 hours
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1015000000, 7, 15, 5);
+
+-- Horas Extras Festivas Diurnas (holiday overtime) - 10 hours
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1015000001, 9, 15, 10);
+
+-- Multiple concepts for same employee
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1015000004, 6, 15, 1);  -- Bonus
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1015000004, 10, 15, 10); -- Overtime
+```
+
+## Novelty Types
+
+### Common Novelty Scenarios
+
+| Concept ID | Concept Name | Typical Use |
+|------------|--------------|-------------|
+| 6 | Bonificación por chismoso | Monthly bonus |
+| 7 | Horas Extras Diurnas | Daytime overtime |
+| 8 | Horas Extras Nocturna | Nighttime overtime |
+| 9 | Horas Extras Festivas Diurnas | Holiday daytime OT |
+| 10 | Horas Extras Festivas Nocturnas | Holiday nighttime OT |
+| 11 | Descuento por Préstamo | Loan deduction |
+
+## Usage Examples
+
+### Insert Overtime Novelty
+
+```sql
+INSERT INTO tab_novedades VALUES(
+    2025,           -- year
+    3,              -- March
+    1,              -- first period
+    1032505813,     -- employee ID
+    7,              -- Horas Extras Diurnas
+    15,             -- days in period
+    8               -- 8 hours overtime
+);
+```
+
+### Query Employee Novelties for a Period
+
+```sql
+SELECT 
+    e.nom_emplea || ' ' || e.ape_emplea as empleado,
+    c.nom_concepto,
+    n.val_dias_trab,
+    n.val_horas_trab
+FROM tab_novedades n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025 
+  AND n.mes_nomina = 1 
+  AND n.per_nomina = 1
+ORDER BY e.ape_emplea, e.nom_emplea;
+```
+
+### Total Overtime Hours by Employee
+
+```sql
+SELECT 
+    e.id_emplea,
+    e.nom_emplea || ' ' || e.ape_emplea as empleado,
+    SUM(n.val_horas_trab) as total_horas_extras
+FROM tab_novedades n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025 
+  AND n.mes_nomina = 1
+  AND c.nom_concepto LIKE '%Horas Extras%'
+GROUP BY e.id_emplea, e.nom_emplea, e.ape_emplea
+ORDER BY total_horas_extras DESC;
+```
+
+### Novelties by Concept Type
+
+```sql
+SELECT 
+    c.nom_concepto,
+    COUNT(*) as num_registros,
+    SUM(n.val_horas_trab) as total_horas
+FROM tab_novedades n
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025 AND n.mes_nomina = 1
+GROUP BY c.id_concepto, c.nom_concepto
+ORDER BY num_registros DESC;
+```
+
+### Employees with Multiple Novelties
+
+```sql
+SELECT 
+    e.id_emplea,
+    e.nom_emplea || ' ' || e.ape_emplea as empleado,
+    COUNT(*) as num_novedades
+FROM tab_novedades n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+WHERE n.ano_nomina = 2025 
+  AND n.mes_nomina = 1 
+  AND n.per_nomina = 1
+GROUP BY e.id_emplea, e.nom_emplea, e.ape_emplea
+HAVING COUNT(*) > 1
+ORDER BY num_novedades DESC;
+```
+
+### Delete Novelties for a Period
+
+```sql
+DELETE FROM tab_novedades
+WHERE ano_nomina = 2025 
+  AND mes_nomina = 1 
+  AND per_nomina = 1;
+```
+
+## Period Management
+
+### Quincenal (Bi-weekly) Periods
+For bi-weekly payroll:
+- **Period 1**: Days 1-15 of the month
+- **Period 2**: Days 16-end of month
+
+### Mensual (Monthly) Periods
+For monthly payroll:
+- **Period 1**: Entire month (days 1-30)
+
+## Data Entry Workflow
+
+1. **Collect novelty data** from timesheets, bonus approvals, loan agreements
+2. **Insert novelties** into tab_novedades
+3. **Verify entries**:
+   ```sql
+   SELECT * FROM tab_novedades 
+   WHERE ano_nomina = [year] AND mes_nomina = [month] AND per_nomina = [period];
+   ```
+4. **Run payroll calculation** to generate tab_nomina records
+5. **Archive or delete** old novelties after payroll is processed
+
+## Integration with Payroll Calculation
+
+Novelties feed into the payroll calculation process:
+
+```sql
+-- Example: Calculate overtime pay
+SELECT 
+    n.id_emplea,
+    e.val_sal_basico,
+    n.val_horas_trab,
+    c.val_porcent,
+    -- Calculate hourly rate
+    (e.val_sal_basico / 30 / 8) as tarifa_hora,
+    -- Calculate overtime amount
+    (e.val_sal_basico / 30 / 8) * n.val_horas_trab * (1 + c.val_porcent/100) as valor_overtime
+FROM tab_novedades n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE c.nom_concepto LIKE '%Horas Extras%'
+  AND n.ano_nomina = 2025 AND n.mes_nomina = 1;
+```
+
+## Related Tables
+
+- **tab_emplea**: Employee master data
+- **tab_conceptos**: Concept definitions and calculation rules
+- **tab_meses**: Month validation
+- **tab_nomina**: Final payroll output (calculated from novelties)
+
+## Notes
+
+<Info>
+  Novelties are input data for payroll processing. They represent variable components that change each pay period, unlike fixed salary stored in tab_emplea.
+</Info>
+
+<Note>
+  The val_dias_trab field is set to 15 in the sample data for quincenal periods. For mensual concepts, it would typically be 30.
+</Note>
+
+<Warning>
+  Ensure novelties are deleted or archived after payroll processing to avoid duplicate processing in subsequent periods.
+</Warning>
+
+## Best Practices
+
+<Check>
+  - Validate employee and concept IDs before insertion
+  - Use val_horas_trab = 1 for non-hourly concepts (like bonuses)
+  - Review all novelties before running payroll calculation
+  - Keep audit trail of who entered each novelty and when
+  - Clear novelties after successful payroll processing
+  - Use transactions when inserting multiple novelties
+</Check>

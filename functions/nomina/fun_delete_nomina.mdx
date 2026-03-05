@@ -1,0 +1,56 @@
+---
+title: 'fun_delete_nomina'
+description: 'Delete a payroll record'
+---
+
+## Overview
+
+Deletes a payroll record from `tab_nomina` by year, month, and period.
+
+## Signature
+
+```sql
+fun_delete_nomina(
+    wano_nom INTEGER,
+    wmes_nom INTEGER,
+    wper_nom INTEGER
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wano_nom" type="INTEGER" required>
+  Payroll year (Primary Key)
+</ParamField>
+
+<ParamField path="wmes_nom" type="INTEGER" required>
+  Payroll month (Primary Key)
+</ParamField>
+
+<ParamField path="wper_nom" type="INTEGER" required>
+  Payroll period (Primary Key)
+</ParamField>
+
+## Returns
+
+VOID (no return value)
+
+## Example Usage
+
+```sql
+-- Delete a payroll record
+SELECT fun_delete_nomina(2025, 1, 1);
+
+-- Delete another payroll period
+SELECT fun_delete_nomina(2024, 12, 2);
+```
+
+## Validation Rules
+
+- The payroll record identified by year, month, and period must exist
+- All three components of the composite key are required
+- This will delete the payroll record but not the related novelties
+
+## Source
+
+`source/func/nomina/fun_delete_nomina.sql`

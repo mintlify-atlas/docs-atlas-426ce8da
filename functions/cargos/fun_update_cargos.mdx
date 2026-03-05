@@ -1,0 +1,62 @@
+---
+title: 'fun_update_cargos'
+description: 'Update an existing position name'
+---
+
+## Overview
+
+Updates the name of an existing position in `tab_cargos`.
+
+## Signature
+
+```sql
+fun_update_cargos(
+    wid_cargo INTEGER,
+    new_nom_cargo VARCHAR
+) RETURNS BOOLEAN
+```
+
+## Parameters
+
+<ParamField path="wid_cargo" type="INTEGER" required>
+  Position ID to update
+</ParamField>
+
+<ParamField path="new_nom_cargo" type="VARCHAR" required>
+  New position name
+</ParamField>
+
+## Returns
+
+- `TRUE` - Position updated successfully
+- `FALSE` - Update failed
+
+## Example Usage
+
+```sql
+-- Update position name
+SELECT fun_update_cargos(1, 'cargo actualizado');
+
+-- Update to 'senior developer'
+SELECT fun_update_cargos(1, 'senior developer');
+```
+
+## Validation Rules
+
+- Position ID must exist in the table
+- New position name cannot be NULL
+- Position name must meet length requirements
+
+## Error Handling
+
+| SQL State | Description |
+|-----------|-------------|
+| 23505 | NULL value in ID field |
+| 23514 | Value violates check constraint |
+| 02000 | Position ID does not exist |
+| 23502 | Attempted to insert NULL value |
+| others | Unknown error |
+
+## Source
+
+`source/func/cargos/fun_update_cargos.sql`

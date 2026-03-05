@@ -1,0 +1,95 @@
+---
+title: 'fun_insert_pmtros'
+description: 'Insert new payroll parameters'
+---
+
+## Overview
+
+Inserts a new set of payroll parameters into `tab_pmtros` with company settings and legal values.
+
+## Signature
+
+```sql
+fun_insert_pmtros(
+    wnom_empresa VARCHAR,
+    wind_perio_pago CHAR(1),
+    wval_smlv NUMERIC,
+    wval_auxtrans NUMERIC,
+    wind_num_trans INTEGER,
+    wano_nom INTEGER,
+    wmes_nom INTEGER,
+    wval_por_intces NUMERIC,
+    wnum_diasmes INTEGER
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wnom_empresa" type="VARCHAR" required>
+  Company name
+</ParamField>
+
+<ParamField path="wind_perio_pago" type="CHAR(1)" required>
+  Payment period: 'Q' (biweekly) or 'M' (monthly)
+</ParamField>
+
+<ParamField path="wval_smlv" type="NUMERIC" required>
+  Minimum wage value (SMLV)
+</ParamField>
+
+<ParamField path="wval_auxtrans" type="NUMERIC" required>
+  Transportation allowance value
+</ParamField>
+
+<ParamField path="wind_num_trans" type="INTEGER" required>
+  Number of transportation allowances
+</ParamField>
+
+<ParamField path="wano_nom" type="INTEGER" required>
+  Payroll year
+</ParamField>
+
+<ParamField path="wmes_nom" type="INTEGER" required>
+  Payroll month
+</ParamField>
+
+<ParamField path="wval_por_intces" type="NUMERIC" required>
+  Interest percentage for severance
+</ParamField>
+
+<ParamField path="wnum_diasmes" type="INTEGER" required>
+  Number of days in the month
+</ParamField>
+
+## Returns
+
+VOID (no return value)
+
+## Example Usage
+
+```sql
+-- Insert payroll parameters
+SELECT fun_insert_pmtros(
+    'MAYASOFT',
+    'Q',
+    1420000,
+    200000,
+    2,
+    2025,
+    1,
+    12,
+    30
+);
+```
+
+## Validation Rules
+
+- Company name cannot be NULL
+- Payment period must be 'Q' or 'M'
+- All numeric values must be positive
+- Year must be valid
+- Month must be between 1-12
+
+## Source
+
+`source/func/pmtros/fun_insert_pmtros.sql`

@@ -1,0 +1,100 @@
+---
+title: 'fun_update_pmtros'
+description: 'Update existing payroll parameters'
+---
+
+## Overview
+
+Updates all fields of existing payroll parameters in `tab_pmtros`.
+
+## Signature
+
+```sql
+fun_update_pmtros(
+    wid_empresa INTEGER,
+    wnom_empresa VARCHAR,
+    wind_perio_pago CHAR(1),
+    wval_smlv NUMERIC,
+    wval_auxtrans NUMERIC,
+    wind_numtrans INTEGER,
+    wano_nom INTEGER,
+    wmes_nom INTEGER,
+    wval_por_intces NUMERIC,
+    wnum_diasmes INTEGER
+) RETURNS VOID
+```
+
+## Parameters
+
+<ParamField path="wid_empresa" type="INTEGER" required>
+  Company ID to update
+</ParamField>
+
+<ParamField path="wnom_empresa" type="VARCHAR" required>
+  New company name
+</ParamField>
+
+<ParamField path="wind_perio_pago" type="CHAR(1)" required>
+  New payment period
+</ParamField>
+
+<ParamField path="wval_smlv" type="NUMERIC" required>
+  New minimum wage value
+</ParamField>
+
+<ParamField path="wval_auxtrans" type="NUMERIC" required>
+  New transportation allowance
+</ParamField>
+
+<ParamField path="wind_numtrans" type="INTEGER" required>
+  New number of transportation allowances
+</ParamField>
+
+<ParamField path="wano_nom" type="INTEGER" required>
+  New payroll year
+</ParamField>
+
+<ParamField path="wmes_nom" type="INTEGER" required>
+  New payroll month
+</ParamField>
+
+<ParamField path="wval_por_intces" type="NUMERIC" required>
+  New interest percentage
+</ParamField>
+
+<ParamField path="wnum_diasmes" type="INTEGER" required>
+  New number of days in month
+</ParamField>
+
+## Returns
+
+VOID (no return value)
+
+## Example Usage
+
+```sql
+-- Update payroll parameters
+SELECT fun_update_pmtros(
+    2,
+    'FC actualizada',
+    'Q',
+    1420000,
+    200000,
+    2,
+    2025,
+    1,
+    12,
+    30
+);
+```
+
+## Validation Rules
+
+- Company ID must exist
+- Payment period must be 'Q' or 'M'
+- All numeric values must be positive
+- Month must be between 1-12
+
+## Source
+
+`source/func/pmtros/fun_update_pmtros.sql`

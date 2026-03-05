@@ -1,80 +1,385 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart Guide'
+description: 'Get started with NominaSoft in under 10 minutes'
+icon: 'rocket'
 ---
 
-## Get started in three steps
+This guide will help you set up NominaSoft and process your first payroll calculation from start to finish.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have:
+- PostgreSQL 12 or higher installed
+- Database access with CREATE privileges
+- Basic understanding of SQL
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Step 1: Initialize the Database
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Create the Database Schema">
+    Run the complete database schema script to create all necessary tables. The system includes tables for employees, positions, concepts, parameters, and payroll records.
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```sql
+    -- Execute the complete schema from script_nomina.sql
+    -- This creates all core tables: tab_conceptos, tab_cargos, tab_meses, 
+    -- tab_pmtros, tab_emplea, tab_novedades, and tab_nomina
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    Key tables created:
+    - `tab_conceptos`: Payroll concepts (earnings/deductions)
+    - `tab_cargos`: Job positions
+    - `tab_meses`: Month definitions
+    - `tab_pmtros`: System parameters (SMLV, transport allowance, etc.)
+    - `tab_emplea`: Employee records
+    - `tab_novedades`: Payroll adjustments/novelties
+    - `tab_nomina`: Final payroll calculations
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Load Core Functions">
+    Install all payroll calculation functions from the `func/` directory, including:
+    - Employee management functions
+    - Concept management functions
+    - Position management functions
+    - The main payroll calculation function `fun_act_nomina()`
+  </Step>
+</Steps>
 
-### Step 3: Go live
+## Step 2: Configure System Parameters
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+Set up your company parameters using the `fun_insert_pmtros()` function:
 
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+```sql
+SELECT fun_insert_pmtros(
+    'EMPRESA LA COSITA RICA',  -- Company name
+    'Q',                        -- Payment period: 'Q' (biweekly) or 'M' (monthly)
+    1423500,                    -- SMLV (minimum wage)
+    200000,                     -- Transportation allowance
+    2,                          -- Transport multiplier
+    2025,                       -- Year
+    1,                          -- Month (January)
+    12,                         -- Interest rate for severance
+    30                          -- Days per month
+);
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+The transport allowance is automatically applied to employees earning up to 2x the minimum wage (SMLV × ind_num_trans).
 </Note>
+
+## Step 3: Set Up Months
+
+Insert month definitions for payroll processing:
+
+```sql
+SELECT fun_insert_meses('Enero');
+SELECT fun_insert_meses('Febrero');
+SELECT fun_insert_meses('Marzo');
+SELECT fun_insert_meses('Abril');
+SELECT fun_insert_meses('Mayo');
+SELECT fun_insert_meses('Junio');
+SELECT fun_insert_meses('Julio');
+SELECT fun_insert_meses('Agosto');
+SELECT fun_insert_meses('Septiembre');
+SELECT fun_insert_meses('Octubre');
+SELECT fun_insert_meses('Noviembre');
+SELECT fun_insert_meses('Diciembre');
+```
+
+## Step 4: Create Job Positions
+
+Define the job positions in your organization:
+
+```sql
+SELECT fun_insert_cargos('Gerente General');
+SELECT fun_insert_cargos('Secretaria General');
+SELECT fun_insert_cargos('Gerente Comercial');
+SELECT fun_insert_cargos('Gerente Financiero');
+SELECT fun_insert_cargos('Gerente de TI');
+SELECT fun_insert_cargos('Scrum Master');
+SELECT fun_insert_cargos('Desarrollador Front Senior');
+SELECT fun_insert_cargos('Desarrollador Back Junior');
+SELECT fun_insert_cargos('Diseñador');
+SELECT fun_insert_cargos('Servicios Generales');
+SELECT fun_insert_cargos('Vigilante');
+```
+
+## Step 5: Define Payroll Concepts
+
+Create the payroll concepts that will be used in calculations:
+
+<CodeGroup>
+```sql Mandatory Earnings
+-- Basic Salary (Concept ID: 1)
+SELECT fun_insert_conceptos(
+    'Salario Básico',    -- Concept name
+    TRUE,                -- Operation: TRUE=add, FALSE=subtract
+    'Q',                 -- Period: 'Q'=biweekly, 'M'=monthly
+    FALSE,               -- Is net paid amount
+    0,                   -- Percentage value
+    0,                   -- Fixed value
+    TRUE                 -- Mandatory by law
+);
+
+-- Transportation Allowance (Concept ID: 2)
+SELECT fun_insert_conceptos(
+    'Auxilio de Transporte',
+    TRUE, 'Q', FALSE, 0, 0, TRUE
+);
+```
+
+```sql Mandatory Deductions
+-- Health Insurance - EPS (Concept ID: 3)
+SELECT fun_insert_conceptos(
+    'Entidad Prestadora de Salud (EPS)',
+    FALSE,   -- Subtract from salary
+    'M',     -- Monthly
+    FALSE,
+    4,       -- 4% of base salary
+    0,
+    TRUE     -- Mandatory
+);
+
+-- Pension - AFP (Concept ID: 4)
+SELECT fun_insert_conceptos(
+    'Administradora de Pensión (AFP)',
+    FALSE, 'M', FALSE, 4, 0, TRUE
+);
+```
+
+```sql Optional Concepts
+-- Net Paid (Concept ID: 5)
+SELECT fun_insert_conceptos(
+    'NETO PAGADO',
+    FALSE, 'Q', TRUE, 0, 0, TRUE
+);
+
+-- Overtime - Daytime (Concept ID: 7)
+SELECT fun_insert_conceptos(
+    'Horas Extras Diurnas',
+    TRUE,    -- Add to salary
+    'Q',     -- Biweekly
+    FALSE,
+    25,      -- 25% surcharge
+    0,
+    FALSE    -- Optional
+);
+
+-- Overtime - Nighttime (Concept ID: 8)
+SELECT fun_insert_conceptos(
+    'Horas Extras Nocturna',
+    TRUE, 'Q', FALSE, 75, 0, FALSE
+);
+
+-- Bonus (Concept ID: 6)
+SELECT fun_insert_conceptos(
+    'Bonificación por chismoso',
+    TRUE, 'M', FALSE, 0, 100000, FALSE
+);
+```
+</CodeGroup>
+
+<Warning>
+Concept IDs are auto-generated sequentially. The order of insertion matters for maintaining the correct ID references in the parameters table.
+</Warning>
+
+## Step 6: Add Employees
+
+Register employees using the `fun_insert_emplea()` function:
+
+```sql
+SELECT fun_insert_emplea(
+    'Carlos Eduardo',      -- First name
+    'Perez Rueda',        -- Last name
+    FALSE,                -- Gender: TRUE=female, FALSE=male
+    'Calle 20',           -- Address
+    3503421739,           -- Phone
+    4,                    -- Socioeconomic level (1-6)
+    0,                    -- Marital status: 0=single, 1=married, 2=divorced, 3=widowed, 4=other
+    3,                    -- Number of children
+    'A+',                 -- Blood type
+    61,                   -- Age
+    5,                    -- Position ID (Gerente de TI)
+    10000000,             -- Base salary
+    '2024-01-01'          -- Start date
+);
+
+-- Add more employees
+SELECT fun_insert_emplea(
+    'Laura Juliana', 'Perez Barrera', TRUE,
+    'Calle 138 Carrera 54', 3102454737, 5,
+    0, 0, 'A+', 25, 3, 8000000, '2024-10-01'
+);
+
+SELECT fun_insert_emplea(
+    'Paula Sofia', 'Perez Moscoso', TRUE,
+    'Arboretto Piedecuesta', 3133216625, 4,
+    0, 0, 'O+', 16, 8, 6500000, '2024-01-01'
+);
+
+SELECT fun_insert_emplea(
+    'Juan Pablo', 'Lopez Bobito', FALSE,
+    'Piedecuesta', 3104444444, 4,
+    0, 1, 'A+', 18, 12, 5000000, '2024-01-01'
+);
+
+SELECT fun_insert_emplea(
+    'Juana', 'La Loca', TRUE,
+    'Calle 28 Cra. 18', 3106666666, 3,
+    0, 3, 'A-', 25, 16, 2500000, '2024-01-01'
+);
+```
+
+## Step 7: Add Payroll Novelties (Optional)
+
+Register any payroll adjustments for the period, such as bonuses, overtime, or deductions:
+
+```sql
+-- Format: (year, month, period, employee_id, concept_id, days_worked, hours_worked)
+
+-- Bonuses for January, Period 1
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 91423627, 6, 15, 1);
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1032505813, 6, 15, 1);
+
+-- Daytime overtime
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1015000000, 7, 15, 5);
+
+-- Holiday overtime
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1015000001, 9, 15, 10);
+
+-- Multiple concepts for one employee
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1015000004, 6, 15, 1);
+INSERT INTO tab_novedades VALUES(2025, 1, 1, 1015000004, 10, 15, 10);
+```
+
+<Note>
+Novelties are optional adjustments. If no novelties are added, the system will calculate standard payroll based on base salaries and mandatory deductions.
+</Note>
+
+## Step 8: Calculate Payroll
+
+Run the main payroll calculation function:
+
+```sql
+-- Calculate payroll for January 2025, Period 1
+SELECT fun_act_nomina(2025, 1, 1);
+```
+
+**Parameters:**
+- `2025` - Year (must match tab_pmtros.ano_nomina)
+- `1` - Month (must match tab_pmtros.mes_nomina)
+- `1` - Period (1 or 2 for biweekly pay)
+
+The function will:
+1. Validate parameters against tab_pmtros
+2. Delete any existing payroll for the period
+3. Calculate base salary (prorated for biweekly)
+4. Apply transportation allowance if salary ≤ 2×SMLV
+5. Calculate mandatory deductions (EPS 4%, AFP 4%)
+6. Insert all results into tab_nomina
+
+## Step 9: View Results
+
+Query the payroll results:
+
+<CodeGroup>
+```sql Complete Payroll
+-- View all payroll records
+SELECT * FROM tab_nomina 
+WHERE ano_nomina = 2025 
+  AND mes_nomina = 1 
+  AND per_nomina = 1
+ORDER BY id_emplea, id_concepto;
+```
+
+```sql Employee Summary
+-- Get payroll summary by employee
+SELECT 
+    n.id_emplea,
+    e.nom_emplea || ' ' || e.ape_emplea AS employee,
+    c.nom_concepto AS concept,
+    n.val_dias_trab AS days_worked,
+    n.val_nomina AS amount
+FROM tab_nomina n
+JOIN tab_emplea e ON n.id_emplea = e.id_emplea
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE n.ano_nomina = 2025 
+  AND n.mes_nomina = 1 
+  AND n.per_nomina = 1
+ORDER BY n.id_emplea, c.ind_operacion DESC;
+```
+
+```sql Net Payment
+-- Calculate net payment per employee
+SELECT 
+    id_emplea,
+    SUM(CASE WHEN c.ind_operacion = TRUE THEN val_nomina ELSE 0 END) AS total_earned,
+    SUM(CASE WHEN c.ind_operacion = FALSE THEN val_nomina ELSE 0 END) AS total_deducted,
+    SUM(CASE WHEN c.ind_operacion = TRUE THEN val_nomina ELSE -val_nomina END) AS net_payment
+FROM tab_nomina n
+JOIN tab_conceptos c ON n.id_concepto = c.id_concepto
+WHERE ano_nomina = 2025 AND mes_nomina = 1 AND per_nomina = 1
+GROUP BY id_emplea;
+```
+</CodeGroup>
+
+## Expected Output
+
+After running the payroll calculation, you should see records in `tab_nomina` with:
+
+- **Base salary**: Prorated for 15 days (biweekly) or 30 days (monthly)
+- **Transportation allowance**: Applied to employees earning ≤ 2×SMLV
+- **EPS deduction**: 4% of base salary (monthly)
+- **AFP deduction**: 4% of base salary (monthly)
+- **Optional concepts**: Any bonuses or overtime from tab_novedades
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Employee Management" icon="users" href="/guides/employee-management">
+    Learn how to manage employee records
+  </Card>
+  <Card title="Concepts Configuration" icon="list-check" href="/guides/concepts-configuration">
+    Configure payroll concepts and rules
+  </Card>
+  <Card title="Payroll Calculation" icon="calculator" href="/guides/payroll-calculation">
+    Deep dive into payroll calculations
+  </Card>
+  <Card title="Database Schema" icon="database" href="/schema/overview">
+    Explore the complete database structure
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Error: Year/month/period don't match PMTROS">
+    Ensure the parameters you pass to `fun_act_nomina()` match the values in `tab_pmtros`:
+    ```sql
+    SELECT ano_nomina, mes_nomina FROM tab_pmtros;
+    ```
+  </Accordion>
+
+  <Accordion title="Employee not receiving transportation allowance">
+    The transportation allowance is only applied if:
+    - Base salary ≤ (SMLV × ind_num_trans)
+    - Default: salary ≤ 2,847,000 (2 × 1,423,500)
+    
+    Check your employee's base salary in `tab_emplea`.
+  </Accordion>
+
+  <Accordion title="Position doesn't exist error">
+    Before adding employees, ensure the position exists:
+    ```sql
+    SELECT * FROM tab_cargos;
+    ```
+    Create missing positions with `fun_insert_cargos()`.
+  </Accordion>
+
+  <Accordion title="Payroll calculation returns FALSE">
+    Check the PostgreSQL NOTICE messages for specific error details:
+    - 22008: Invalid year/month/period
+    - 23502: NULL value in required field
+    - 23503: Foreign key violation (position doesn't exist)
+    - 23505: Duplicate record
+  </Accordion>
+</AccordionGroup>

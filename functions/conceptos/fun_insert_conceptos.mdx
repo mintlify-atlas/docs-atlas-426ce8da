@@ -1,0 +1,102 @@
+---
+title: 'fun_insert_conceptos'
+description: 'Insert a new payroll concept'
+---
+
+## Overview
+
+Inserts a new payroll concept into `tab_conceptos` with calculation rules and payment settings.
+
+## Signature
+
+```sql
+fun_insert_conceptos(
+    wnom_concepto VARCHAR,
+    wind_operacion BOOLEAN,
+    wind_perio_pago CHAR(1),
+    wneto_pagado BOOLEAN,
+    wval_porcent NUMERIC,
+    wval_fijo NUMERIC,
+    wind_legal BOOLEAN
+) RETURNS BOOLEAN
+```
+
+## Parameters
+
+<ParamField path="wnom_concepto" type="VARCHAR" required>
+  Concept name (minimum 5 characters)
+</ParamField>
+
+<ParamField path="wind_operacion" type="BOOLEAN" required>
+  Operation indicator (TRUE for addition, FALSE for subtraction)
+</ParamField>
+
+<ParamField path="wind_perio_pago" type="CHAR(1)" required>
+  Payment period: 'Q' (quincenal/biweekly) or 'M' (mensual/monthly)
+</ParamField>
+
+<ParamField path="wneto_pagado" type="BOOLEAN" required>
+  Indicates if concept affects net payment
+</ParamField>
+
+<ParamField path="wval_porcent" type="NUMERIC" required>
+  Percentage value (0-100)
+</ParamField>
+
+<ParamField path="wval_fijo" type="NUMERIC" required>
+  Fixed value amount
+</ParamField>
+
+<ParamField path="wind_legal" type="BOOLEAN" required>
+  Indicates if concept is legally mandated
+</ParamField>
+
+## Returns
+
+- `TRUE` - Concept inserted successfully
+- `FALSE` - Insert failed
+
+## Example Usage
+
+```sql
+-- Insert a new concept
+SELECT fun_insert_conceptos(
+    'concepto3',
+    FALSE,
+    'Q',
+    TRUE,
+    0,
+    1067625,
+    TRUE
+);
+
+-- Insert a percentage-based deduction
+SELECT fun_insert_conceptos(
+    'Health Insurance',
+    FALSE,
+    'M',
+    TRUE,
+    4,
+    0,
+    TRUE
+);
+```
+
+## Validation Rules
+
+- Concept name must be at least 5 characters
+- Payment period must be 'Q' or 'M'
+- Percentage value must be between 0 and 100
+- Fixed value must be positive
+
+## Error Handling
+
+| SQL State | Description |
+|-----------|-------------|
+| 23505 | NULL value in ID field |
+| 23514 | Value violates check constraint |
+| others | Unknown error during insert |
+
+## Source
+
+`source/func/conceptos/fun_insert_conceptos.sql`

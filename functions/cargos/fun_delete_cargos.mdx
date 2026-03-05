@@ -1,0 +1,57 @@
+---
+title: 'fun_delete_cargos'
+description: 'Delete a position from the positions table'
+---
+
+## Overview
+
+Deletes a position record from `tab_cargos` by ID.
+
+## Signature
+
+```sql
+fun_delete_cargos(
+    wid_cargo INTEGER
+) RETURNS BOOLEAN
+```
+
+## Parameters
+
+<ParamField path="wid_cargo" type="INTEGER" required>
+  Position ID to delete
+</ParamField>
+
+## Returns
+
+- `TRUE` - Position deleted successfully
+- `FALSE` - Delete failed
+
+## Example Usage
+
+```sql
+-- Delete a position
+SELECT fun_delete_cargos(1);
+
+-- Delete position with ID 5
+SELECT fun_delete_cargos(5);
+```
+
+## Validation Rules
+
+- Position ID must exist
+- ID must not exceed 2 digits
+- Cannot delete positions referenced by employees
+
+## Error Handling
+
+| SQL State | Description |
+|-----------|-------------|
+| 02000 | Position ID does not exist |
+| 23502 | Attempted to use NULL value |
+| 22003 | Number is too large |
+| 22P02 | Invalid data format |
+| others | Unknown error |
+
+## Source
+
+`source/func/cargos/fun_delete_cargos.sql`

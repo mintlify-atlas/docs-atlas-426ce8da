@@ -1,0 +1,653 @@
+---
+title: "Error Handling Guide"
+description: "Complete reference for PostgreSQL SQLSTATE error codes and their meanings in NominaSoft"
+---
+
+## Overview
+
+NominaSoft uses PostgreSQL's SQLSTATE error code system to handle and communicate errors. The `tab_error` table contains a comprehensive catalog of all possible error codes and their descriptions.
+
+## Error Code Structure
+
+SQLSTATE codes are 5-character strings organized by class:
+
+- **First 2 characters**: Error class (e.g., `22` = Data Exception, `23` = Integrity Constraint Violation)
+- **Last 3 characters**: Specific error within that class
+
+### Common Error Classes
+
+| Class | Category | Description |
+|-------|----------|-------------|
+| `00` | Success | Operation completed successfully |
+| `22` | Data Exception | Invalid data format or value |
+| `23` | Integrity Constraint | Violation of constraints (FK, unique, NOT NULL, check) |
+| `42` | Syntax Error | SQL syntax or access rule violation |
+| `P0` | PL/pgSQL | Procedural language errors |
+| `53` | Resources | Insufficient system resources |
+| `57` | Operator Intervention | Query canceled or system shutdown |
+
+## Critical Errors in Payroll Calculation
+
+The `fun_act_nomina()` function handles these specific errors:
+
+### SQLSTATE 22008 - Datetime Field Overflow
+
+**Triggered when**: Year, month, or period parameters don't match `tab_pmtros` configuration
+
+```sql
+IF wano_nomina <> wreg_pmtros.ano_nomina THEN
+    RAISE EXCEPTION USING ERRCODE = 22008;
+END IF;
+IF wmes_nomina <> wreg_pmtros.mes_nomina THEN
+    RAISE EXCEPTION USING ERRCODE = 22008;
+END IF;
+IF wper_nomina > 2 THEN
+    RAISE EXCEPTION USING ERRCODE = 22008;
+END IF;
+
+EXCEPTION
+    WHEN SQLSTATE '22008' THEN
+        RAISE NOTICE 'El año, o el mes, o el período no corresponden al de PMTROS... Arréglelo Bestia';
+        RETURN FALSE;
+```
+
+**Resolution**:
+1. Check current parameters: `SELECT ano_nomina, mes_nomina FROM tab_pmtros;`
+2. Call function with matching values: `SELECT fun_act_nomina(2025, 1, 1);`
+3. Or update parameters if needed: `UPDATE tab_pmtros SET mes_nomina = 2 WHERE ...;`
+
+<Warning>
+The `per_nomina` parameter must be 1 or 2. Values > 2 trigger this error.
+</Warning>
+
+### SQLSTATE 23502 - Not Null Violation
+
+**Triggered when**: A required (NOT NULL) field receives a NULL value
+
+```sql
+EXCEPTION
+    WHEN SQLSTATE '23502' THEN
+        RAISE NOTICE 'Está mandando un NULO en el ID... Sea serio';
+        RETURN FALSE;
+```
+
+**Common scenarios**:
+- Missing employee ID in function call
+- NULL salary value for employee
+- Missing concept ID in insert
+
+**Resolution**: Ensure all required fields have values before calling functions
+
+### SQLSTATE 23503 - Foreign Key Violation
+
+**Triggered when**: Referenced record doesn't exist
+
+```sql
+EXCEPTION
+    WHEN SQLSTATE '23503' THEN  
+        RAISE NOTICE 'El Cargo no existe... Créelo y vuelva, o ni se aparezca más por acá';
+        RETURN FALSE;
+```
+
+**Common scenarios**:
+
+<Tabs>
+  <Tab title="Employee Creation">
+    Attempting to create employee with non-existent position:
+    
+    ```sql
+    -- This will fail if id_cargo = 99 doesn't exist
+    SELECT fun_insert_emplea(
+        'Juan', 'Perez', FALSE, 'Calle 1', 3001234567,
+        3, 0, 0, 'O+', 25,
+        99,  -- Invalid cargo ID
+        5000000, '2024-01-01'
+    );
+    ```
+    
+    **Fix**: Create the position first:
+    ```sql
+    INSERT INTO tab_cargos VALUES(99, 'Nuevo Cargo');
+    ```
+  </Tab>
+  
+  <Tab title="Concept Configuration">
+    Setting invalid concept IDs in parameters:
+    
+    ```sql
+    -- This will fail if concept 99 doesn't exist
+    UPDATE tab_pmtros SET id_concep_sb = 99;
+    ```
+    
+    **Fix**: Use existing concept ID or create the concept first
+  </Tab>
+  
+  <Tab title="Payroll Calculation">
+    Employee references deleted position:
+    
+    ```sql
+    -- If employee has id_cargo = 5 but cargo 5 was deleted
+    SELECT * FROM tab_emplea WHERE id_cargo NOT IN (SELECT id_cargo FROM tab_cargos);
+    ```
+    
+    **Fix**: Reassign employees before deleting positions
+  </Tab>
+</Tabs>
+
+### SQLSTATE 23505 - Unique Violation
+
+**Triggered when**: Attempting to insert duplicate primary key or unique constraint
+
+```sql
+EXCEPTION
+    WHEN SQLSTATE '23505' THEN  
+       RAISE NOTICE 'El registro ya existe.. Trabaje bien o ábrase llaveee';
+       RETURN FALSE;
+```
+
+**Common scenarios**:
+- Manually inserting employee with existing ID
+- Duplicate payroll calculation (same year/month/period/employee/concept)
+- Re-inserting concept with same ID
+
+**Resolution**: 
+- For employees: Use the insert function (auto-generates ID)
+- For payroll: The system deletes existing records before recalculation
+- For manual inserts: Check for existing records first
+
+### SQLSTATE 22001 - String Data Right Truncation
+
+**Triggered when**: String value exceeds column length
+
+```sql
+EXCEPTION
+    WHEN SQLSTATE '22001' THEN  
+        RAISE NOTICE 'El nombre es muy corto.. Es de su abuelita?';
+        RETURN FALSE;
+```
+
+<Note>
+This error message is misleading - it actually triggers when the string is **too long**, not too short. The constraint checks (`LENGTH(nom_emplea) >= 3`) handle minimum length.
+</Note>
+
+**Resolution**: Shorten the input value to fit column constraints
+
+### SQLSTATE P0001 - Raise Exception
+
+**Triggered when**: Insert or update operation fails unexpectedly
+
+```sql
+INSERT INTO tab_nomina VALUES(...);  
+IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0001';
+END IF;
+```
+
+This is a catch-all for insert failures. Check:
+- Constraint violations
+- Data type mismatches
+- Permission issues
+
+## Data Exception Errors (Class 22)
+
+Comprehensive list of data-related errors from `tab_error`:
+
+<AccordionGroup>
+  <Accordion title="22000 - Data Exception (General)">
+    **Description**: Generic data exception
+    
+    **Common causes**:
+    - Invalid data format
+    - Type conversion failures
+    - Constraint violations
+    
+    **Example**:
+    ```sql
+    -- Attempting to insert text into numeric field
+    UPDATE tab_emplea SET tel_emplea = 'abc' WHERE id_emplea = 123;
+    ```
+  </Accordion>
+  
+  <Accordion title="22008 - Datetime Field Overflow">
+    **Description**: Date/time value out of range or invalid
+    
+    **Used in NominaSoft for**: Parameter validation in `fun_act_nomina()`
+    
+    **Example**:
+    ```sql
+    -- Calling payroll with wrong month
+    SELECT fun_act_nomina(2025, 13, 1);  -- Month 13 doesn't exist
+    ```
+  </Accordion>
+  
+  <Accordion title="22012 - Division By Zero">
+    **Description**: Arithmetic operation attempted division by zero
+    
+    **Example**:
+    ```sql
+    -- If num_diasmes is somehow 0
+    wval_salario / wreg_pmtros.num_diasmes  -- Error!
+    ```
+    
+    **Prevention**: Always validate denominators in calculations
+  </Accordion>
+  
+  <Accordion title="22003 - Numeric Value Out Of Range">
+    **Description**: Number too large or small for column type
+    
+    **Example**:
+    ```sql
+    -- Salary exceeds DECIMAL(8) limit
+    UPDATE tab_emplea SET val_sal_basico = 999999999;  -- Too large!
+    ```
+    
+    **Fix**: Use appropriate numeric types for your data range
+  </Accordion>
+  
+  <Accordion title="22001 - String Data Right Truncation">
+    **Description**: String too long for column
+    
+    **Example**:
+    ```sql
+    -- Name too long for VARCHAR constraint
+    SELECT fun_insert_emplea(
+        'Supercalifragilisticexpialidocious...', -- Very long name
+        ...
+    );
+    ```
+  </Accordion>
+  
+  <Accordion title="22P02 - Invalid Text Representation">
+    **Description**: Cannot convert text to target data type
+    
+    **Example**:
+    ```sql
+    -- Attempting to cast invalid string to number
+    SELECT CAST('abc' AS INTEGER);  -- Error!
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Integrity Constraint Errors (Class 23)
+
+<AccordionGroup>
+  <Accordion title="23000 - Integrity Constraint Violation (General)">
+    **Description**: Generic constraint violation
+    
+    All constraint violations fall under this class.
+  </Accordion>
+  
+  <Accordion title="23502 - Not Null Violation">
+    **Description**: Attempting to insert NULL into NOT NULL column
+    
+    **From tab_error**:
+    ```
+    Not Null Violation: Columna no permite nulos.
+    ```
+    
+    **Example**:
+    ```sql
+    INSERT INTO tab_emplea (id_emplea, nom_emplea) 
+    VALUES (123, NULL);  -- nom_emplea is NOT NULL
+    ```
+    
+    **All NOT NULL fields in tab_emplea**:
+    - id_emplea, nom_emplea, ape_emplea
+    - ind_genero, dir_emplea, tel_emplea
+    - ind_estrato, ind_est_civil, num_hijos
+    - val_tipo_sangre, val_edad
+    - id_cargo, val_sal_basico, fec_ingreso
+  </Accordion>
+  
+  <Accordion title="23503 - Foreign Key Violation">
+    **Description**: Referenced record doesn't exist
+    
+    **From tab_error**:
+    ```
+    Foreign Key Violation: Violación de clave foránea.
+    ```
+    
+    **Foreign key relationships**:
+    
+    | Table | Column | References |
+    |-------|--------|------------|
+    | tab_emplea | id_cargo | tab_cargos(id_cargo) |
+    | tab_pmtros | mes_nomina | tab_meses(id_mes) |
+    | tab_pmtros | id_concep_sb | tab_conceptos(id_concepto) |
+    | tab_pmtros | id_concep_at | tab_conceptos(id_concepto) |
+    | tab_nomina | id_emplea | tab_emplea(id_emplea) |
+    | tab_nomina | id_concepto | tab_conceptos(id_concepto) |
+    | tab_nomina | mes_nomina | tab_meses(id_mes) |
+    | tab_novedades | id_emplea | tab_emplea(id_emplea) |
+    | tab_novedades | id_concepto | tab_conceptos(id_concepto) |
+  </Accordion>
+  
+  <Accordion title="23505 - Unique Violation">
+    **Description**: Duplicate value in unique/primary key column
+    
+    **From tab_error**:
+    ```
+    Unique Violation: Violación de restricción única.
+    ```
+    
+    **Primary keys in NominaSoft**:
+    - tab_emplea: `id_emplea`
+    - tab_cargos: `id_cargo`
+    - tab_conceptos: `id_concepto`
+    - tab_meses: `id_mes`
+    - tab_pmtros: `id_empresa`
+    - tab_nomina: `(ano_nomina, mes_nomina, per_nomina, id_emplea, id_concepto)`
+    - tab_novedades: `(ano_nomina, mes_nomina, per_nomina, id_emplea, id_concepto)`
+  </Accordion>
+  
+  <Accordion title="23514 - Check Violation">
+    **Description**: Value doesn't satisfy CHECK constraint
+    
+    **From tab_error**:
+    ```
+    Check Violation: Violación de restricción CHECK.
+    ```
+    
+    **Common CHECK constraints**:
+    
+    ```sql
+    -- Employee constraints
+    CHECK(LENGTH(nom_emplea) >= 3)
+    CHECK(LENGTH(ape_emplea) >= 2)
+    CHECK(ind_estrato BETWEEN 1 AND 6)
+    CHECK(ind_est_civil BETWEEN 0 AND 4)
+    CHECK(val_edad >= 16)
+    CHECK(val_sal_basico >= 0)
+    
+    -- Concept constraints
+    CHECK(LENGTH(nom_concepto) >= 5)
+    CHECK(ind_perio_pago = 'Q' OR ind_perio_pago = 'M')
+    CHECK(val_porcent >= 0)
+    CHECK(val_fijo >= 0)
+    
+    -- Novelty constraints
+    CHECK(val_dias_trab >= 1 AND val_dias_trab <= 30)
+    CHECK(val_horas_trab >= 1 AND val_horas_trab <= 24)
+    ```
+    
+    **Example violation**:
+    ```sql
+    -- Age below minimum
+    SELECT fun_insert_emplea(
+        'Juan', 'Perez', FALSE, 'Calle 1', 3001234567,
+        3, 0, 0, 'O+', 
+        15,  -- Age 15 violates CHECK(val_edad >= 16)
+        5, 5000000, '2024-01-01'
+    );
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## PL/pgSQL Errors (Class P0)
+
+Errors specific to PostgreSQL procedural language:
+
+<AccordionGroup>
+  <Accordion title="P0000 - PL/pgSQL Error (General)">
+    **Description**: General PL/pgSQL error
+    
+    **From tab_error**:
+    ```
+    PL/pgSQL Error: Error general en PL/pgSQL.
+    ```
+  </Accordion>
+  
+  <Accordion title="P0001 - Raise Exception">
+    **Description**: Explicitly raised exception
+    
+    **From tab_error**:
+    ```
+    Raise Exception: Se ejecutó RAISE EXCEPTION.
+    ```
+    
+    **Used in NominaSoft for**: Insert operation failures
+    
+    ```sql
+    INSERT INTO tab_nomina VALUES(...);
+    IF NOT FOUND THEN
+        RAISE EXCEPTION USING ERRCODE = 'P0001';
+    END IF;
+    ```
+  </Accordion>
+  
+  <Accordion title="P0002 - No Data Found">
+    **Description**: SELECT INTO returned no rows
+    
+    **From tab_error**:
+    ```
+    No Data Found: No se encontraron datos en PL/pgSQL.
+    ```
+    
+    **Example**:
+    ```sql
+    SELECT nom_emplea INTO v_name 
+    FROM tab_emplea 
+    WHERE id_emplea = 999999;  -- Doesn't exist
+    -- Raises P0002
+    ```
+  </Accordion>
+  
+  <Accordion title="P0003 - Too Many Rows">
+    **Description**: SELECT INTO returned multiple rows
+    
+    **From tab_error**:
+    ```
+    Too Many Rows: Se obtuvieron más filas de las esperadas.
+    ```
+    
+    **Example**:
+    ```sql
+    SELECT nom_emplea INTO v_name 
+    FROM tab_emplea;  -- Returns all employees
+    -- Raises P0003 (expected single row)
+    ```
+    
+    **Fix**: Add WHERE clause or use cursor/array
+  </Accordion>
+  
+  <Accordion title="P0004 - Assert Failure">
+    **Description**: ASSERT statement failed
+    
+    **From tab_error**:
+    ```
+    Assert Failure: Falla en aserción en PL/pgSQL.
+    ```
+    
+    **Example**:
+    ```sql
+    ASSERT val_sal_basico > 0, 'Salary must be positive';
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Syntax and Access Errors (Class 42)
+
+<AccordionGroup>
+  <Accordion title="42000 - Syntax Error or Access Rule Violation">
+    **Description**: General SQL syntax error
+    
+    **From tab_error**:
+    ```
+    Syntax Error or Access Rule Violation: Error de sintaxis o violación de reglas de acceso.
+    ```
+  </Accordion>
+  
+  <Accordion title="42601 - Syntax Error">
+    **Description**: SQL syntax error
+    
+    **From tab_error**:
+    ```
+    Syntax Error: Error de sintaxis.
+    ```
+    
+    **Example**:
+    ```sql
+    SELECT * FORM tab_emplea;  -- Typo: FORM instead of FROM
+    ```
+  </Accordion>
+  
+  <Accordion title="42501 - Insufficient Privilege">
+    **Description**: User lacks permission for operation
+    
+    **From tab_error**:
+    ```
+    Insufficient Privilege: Privilegios insuficientes.
+    ```
+    
+    **Example**:
+    ```sql
+    -- User without DELETE permission
+    DELETE FROM tab_emplea WHERE id_emplea = 123;
+    ```
+  </Accordion>
+  
+  <Accordion title="42804 - Datatype Mismatch">
+    **Description**: Incompatible data types in operation
+    
+    **From tab_error**:
+    ```
+    Datatype Mismatch: Tipos de datos incompatibles.
+    ```
+    
+    **Example**:
+    ```sql
+    SELECT id_emplea + nom_emplea FROM tab_emplea;  -- Can't add number to text
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## System Resource Errors (Class 53)
+
+<AccordionGroup>
+  <Accordion title="53000 - Insufficient Resources">
+    **From tab_error**:
+    ```
+    Insufficient Resources: Recursos insuficientes.
+    ```
+  </Accordion>
+  
+  <Accordion title="53100 - Disk Full">
+    **From tab_error**:
+    ```
+    Disk Full: Disco lleno.
+    ```
+    
+    **Resolution**: Free up disk space or expand storage
+  </Accordion>
+  
+  <Accordion title="53200 - Out Of Memory">
+    **From tab_error**:
+    ```
+    Out Of Memory: Memoria insuficiente.
+    ```
+    
+    **Causes**:
+    - Very large result sets
+    - Complex queries
+    - Insufficient server RAM
+  </Accordion>
+  
+  <Accordion title="53300 - Too Many Connections">
+    **From tab_error**:
+    ```
+    Too Many Connections: Demasiadas conexiones.
+    ```
+    
+    **Resolution**: 
+    - Close unused connections
+    - Increase `max_connections` in PostgreSQL config
+    - Implement connection pooling
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling Best Practices
+
+<Steps>
+  <Step title="Validate inputs before function calls">
+    Check that all required data exists:
+    ```sql
+    -- Before creating employee, verify position exists
+    SELECT id_cargo FROM tab_cargos WHERE id_cargo = target_id;
+    
+    -- Before payroll calculation, verify parameters match
+    SELECT ano_nomina, mes_nomina FROM tab_pmtros;
+    ```
+  </Step>
+  
+  <Step title="Use transactions for multi-step operations">
+    ```sql
+    BEGIN;
+        -- Multiple related operations
+        SELECT fun_insert_emplea(...);
+        UPDATE tab_cargos SET ...;
+    COMMIT;
+    
+    -- If any operation fails, all are rolled back
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            RAISE NOTICE 'Operation failed: %', SQLERRM;
+    ```
+  </Step>
+  
+  <Step title="Log errors for debugging">
+    ```sql
+    EXCEPTION
+        WHEN SQLSTATE '23503' THEN
+            RAISE NOTICE 'FK violation: % at %', SQLERRM, CURRENT_TIMESTAMP;
+            -- Log to error table
+            INSERT INTO error_log VALUES(CURRENT_TIMESTAMP, SQLSTATE, SQLERRM);
+    ```
+  </Step>
+  
+  <Step title="Provide user-friendly error messages">
+    Convert SQLSTATE codes to meaningful messages:
+    ```sql
+    EXCEPTION
+        WHEN SQLSTATE '23502' THEN
+            RETURN 'Required field is missing';
+        WHEN SQLSTATE '23503' THEN
+            RETURN 'Referenced record does not exist';
+        WHEN SQLSTATE '23505' THEN
+            RETURN 'Record already exists';
+    ```
+  </Step>
+</Steps>
+
+## Querying Error Codes
+
+The `tab_error` table provides a complete reference:
+
+```sql
+-- Search for specific error code
+SELECT cod_error, name_error 
+FROM tab_error 
+WHERE cod_error = '23505';
+
+-- Find all integrity constraint errors
+SELECT cod_error, name_error 
+FROM tab_error 
+WHERE cod_error LIKE '23%'
+ORDER BY cod_error;
+
+-- Search by keyword
+SELECT cod_error, name_error 
+FROM tab_error 
+WHERE name_error ILIKE '%foreign key%';
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payroll Calculation" icon="calculator" href="/guides/payroll-calculation">
+    See how errors are handled in payroll processing
+  </Card>
+  <Card title="Employee Management" icon="users" href="/guides/employee-management">
+    Common errors in employee CRUD operations
+  </Card>
+</CardGroup>

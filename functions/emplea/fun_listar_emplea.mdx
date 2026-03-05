@@ -1,0 +1,147 @@
+---
+title: 'fun_listar_emplea'
+description: 'Lists employee records with position information (educational example)'
+---
+
+## Overview
+
+This function retrieves employee information along with their position details from the `tab_emplea` and `tab_cargos` tables. It was created as an educational example to demonstrate the use of PostgreSQL's `RECORD` data type.
+
+<Note>
+  This function is **not used in production code**. For querying and listing data, direct SQL SELECT statements are recommended over stored functions for better performance and flexibility.
+</Note>
+
+## Function Signature
+
+```sql
+CREATE OR REPLACE FUNCTION fun_listar_emplea(
+    wid_emplea tab_emplea.id_emplea%TYPE,
+    wwid_emplea tab_emplea.id_emplea%TYPE
+) RETURNS BOOLEAN
+```
+
+## Parameters
+
+<ParamField path="wid_emplea" type="INTEGER" required>
+  Starting employee ID for the range query. Must be greater than or equal to 11111111.
+</ParamField>
+
+<ParamField path="wwid_emplea" type="INTEGER" required>
+  Ending employee ID for the range query. Defines the upper bound of the search range.
+</ParamField>
+
+## Return Type
+
+`BOOLEAN`
+- Returns `TRUE` if the query executes successfully
+- Returns `FALSE` if validation fails (employee ID less than 11111111)
+
+## Business Logic
+
+1. **Validation**: Checks if the starting employee ID is at least 11111111
+2. **Range Query**: Retrieves employees within the specified ID range (inclusive)
+3. **Join Operation**: Combines employee data with position information from `tab_cargos`
+4. **RECORD Type**: Uses a RECORD variable to store the query results
+5. **Output via NOTICE**: Displays results using PostgreSQL's `RAISE NOTICE` statement
+
+## Data Retrieved
+
+The function retrieves the following fields:
+
+- `id_emplea` - Employee ID
+- `nom_emplea` - First name
+- `ape_emplea` - Last name
+- `ind_genero` - Gender
+- `dir_emplea` - Address
+- `tel_emplea` - Phone number
+- `ind_estrato` - Socioeconomic stratum
+- `ind_est_civil` - Civil status
+- `num_hijos` - Number of children
+- `val_tipo_sangre` - Blood type
+- `val_edad` - Age
+- `id_cargo` - Position ID
+- `nom_cargo` - Position name (from tab_cargos)
+- `val_sal_basico` - Base salary
+- `fec_ingreso` - Hire date
+
+## Usage Example
+
+```sql
+-- Query employees with IDs between 91423627 and 1000000000
+SELECT fun_listar_emplea(91423627, 1000000000);
+
+-- The function will output results via RAISE NOTICE:
+-- NOTICE: 91423627,Juan,Pérez,M,Calle 123,3001234567,3,C,2,O+,35,1,Manager,2500000,2024-03-24
+```
+
+## Validation Example
+
+```sql
+-- Attempt to query with invalid ID (too small)
+SELECT fun_listar_emplea(100, 200);
+
+-- Output:
+-- NOTICE: Don´t be brutation... Go back to the elementary school, asshole
+-- Returns: FALSE
+```
+
+## Why This Function Exists
+
+<Info>
+  **Educational Purpose**: This function was created to demonstrate:
+  - How to use PostgreSQL's `RECORD` data type
+  - How to join tables within a stored function
+  - How to use `RAISE NOTICE` for debugging and output
+  - The concept of range queries with BETWEEN operator
+</Info>
+
+## Recommended Alternative
+
+For production use, replace this function with a direct SQL query:
+
+```sql
+-- More efficient and flexible approach
+SELECT 
+    a.id_emplea,
+    a.nom_emplea,
+    a.ape_emplea,
+    a.ind_genero,
+    a.dir_emplea,
+    a.tel_emplea,
+    a.ind_estrato,
+    a.ind_est_civil,
+    a.num_hijos,
+    a.val_tipo_sangre,
+    a.val_edad,
+    a.id_cargo,
+    b.nom_cargo,
+    a.val_sal_basico,
+    a.fec_ingreso
+FROM tab_emplea a
+INNER JOIN tab_cargos b ON a.id_cargo = b.id_cargo
+WHERE a.id_emplea BETWEEN 91423627 AND 1000000000;
+```
+
+## Advantages of Direct SQL
+
+- **Performance**: No function call overhead
+- **Flexibility**: Easily modify SELECT columns, WHERE conditions, and ORDER BY
+- **Result Set**: Returns data as a standard result set, not NOTICE messages
+- **Tooling**: Better support in ORMs, query builders, and database clients
+- **Pagination**: Easy to add LIMIT and OFFSET for pagination
+- **Filtering**: Simple to add additional WHERE conditions dynamically
+
+## Limitations
+
+- Only retrieves one record at a time (uses SELECT INTO, not RETURN QUERY)
+- Output via RAISE NOTICE is difficult to parse programmatically
+- Limited to range queries on employee ID
+- No support for sorting, filtering by other fields, or pagination
+- Arbitrary validation threshold (11111111) has no business logic basis
+
+## Source
+
+Location: `~/workspace/source/func/emplea/fun_listar_emplea.sql:10`
+
+Author: Camilo Suarez  
+Date: 2024/2025

@@ -1,0 +1,212 @@
+---
+title: tab_conceptos Table
+description: Payroll concepts table for earnings and deductions
+---
+
+## Overview
+
+The `tab_conceptos` table stores all payroll concepts that can be applied to employee payroll. Each concept represents either an earning (devengado) or deduction (deducción) with specific calculation rules, payment periods, and legal requirements.
+
+## Table Definition
+
+```sql
+CREATE TABLE IF NOT EXISTS tab_conceptos
+(
+    id_concepto     DECIMAL(2)      NOT NULL,
+    nom_concepto    VARCHAR         NOT NULL CHECK(LENGTH(nom_concepto)>=5),
+    ind_operacion   BOOLEAN         NOT NULL, -- TRUE SUMA / FALSE RESTA  
+    ind_perio_pago  CHAR(1)         NOT NULL DEFAULT 'Q' CHECK(ind_perio_pago = 'Q' OR ind_perio_pago = 'M'),
+    neto_pagado     BOOLEAN         NOT NULL DEFAULT FALSE,
+    val_porcent     DECIMAL(3,0)    NOT NULL CHECK(val_porcent >= 0),
+    val_fijo        DECIMAL(8,0)    NOT NULL CHECK(val_fijo >= 0),
+    ind_legal       BOOLEAN         NOT NULL,
+    PRIMARY KEY (id_concepto)
+);
+```
+
+## Column Reference
+
+<ParamField path="id_concepto" type="DECIMAL(2)" required>
+  Unique identifier for each payroll concept (01-99). Primary key.
+</ParamField>
+
+<ParamField path="nom_concepto" type="VARCHAR" required>
+  Name of the payroll concept. Must be at least 5 characters long.
+  
+  **Constraint**: `LENGTH(nom_concepto) >= 5`
+</ParamField>
+
+<ParamField path="ind_operacion" type="BOOLEAN" required>
+  Operation indicator:
+  - `TRUE`: Addition (Devengado/Earning)
+  - `FALSE`: Subtraction (Deducción/Deduction)
+</ParamField>
+
+<ParamField path="ind_perio_pago" type="CHAR(1)" default="Q">
+  Payment period indicator:
+  - `'Q'`: Quincenal (Bi-weekly)
+  - `'M'`: Mensual (Monthly)
+  
+  **Constraint**: Must be 'Q' or 'M'
+</ParamField>
+
+<ParamField path="neto_pagado" type="BOOLEAN" default="FALSE">
+  Indicates if this concept represents the net payment:
+  - `TRUE`: This is the NETO PAGADO (net paid) concept
+  - `FALSE`: Regular concept
+</ParamField>
+
+<ParamField path="val_porcent" type="DECIMAL(3,0)" required>
+  Percentage value if the concept is calculated as a percentage of salary. Set to 0 if not applicable.
+  
+  **Constraint**: `val_porcent >= 0`
+  
+  Examples:
+  - EPS (Health): 4%
+  - AFP (Pension): 4%
+  - Overtime rates: 25%, 75%, 100%, 150%
+</ParamField>
+
+<ParamField path="val_fijo" type="DECIMAL(8,0)" required>
+  Fixed value if the concept has a permanent fixed amount. Set to 0 if not applicable. Can be modified by users.
+  
+  **Constraint**: `val_fijo >= 0`
+  
+  Example: "Bonificación por chismoso" = 100,000 COP
+</ParamField>
+
+<ParamField path="ind_legal" type="BOOLEAN" required>
+  Legal requirement indicator:
+  - `TRUE`: Mandatory by Colombian law
+  - `FALSE`: Optional/company-specific benefit
+</ParamField>
+
+## Constraints
+
+### Primary Key
+- **id_concepto**: Unique concept identifier (2 digits)
+
+### Check Constraints
+- **nom_concepto**: Minimum 5 characters
+- **ind_perio_pago**: Must be 'Q' (quincenal) or 'M' (mensual)
+- **val_porcent**: Must be >= 0
+- **val_fijo**: Must be >= 0
+
+### Default Values
+- **ind_perio_pago**: 'Q' (quincenal)
+- **neto_pagado**: FALSE
+
+## Sample Data
+
+The table includes various types of payroll concepts:
+
+### Mandatory Earnings (Devengados Obligatorios)
+
+```sql
+INSERT INTO tab_conceptos VALUES(1, 'Salario Básico',                    TRUE,   'Q',    FALSE,  0,      0,      TRUE);
+INSERT INTO tab_conceptos VALUES(2, 'Auxilio de Transporte',             TRUE,   'Q',    FALSE,  0,      0,      TRUE);
+```
+
+### Mandatory Deductions (Deducciones Obligatorias)
+
+```sql
+INSERT INTO tab_conceptos VALUES(3, 'Entidad Prestadora de Salud (EPS)', FALSE,  'M',    FALSE,  4,      0,      TRUE);
+INSERT INTO tab_conceptos VALUES(4, 'Administradora de Pensión (AFP)',   FALSE,  'M',    FALSE,  4,      0,      TRUE);
+```
+
+### Net Payment Concept
+
+```sql
+INSERT INTO tab_conceptos VALUES(5, 'NETO PAGADO',                       FALSE,  'Q',    TRUE,   0,      0,      TRUE);
+```
+
+### Optional Earnings (Devengados No Obligatorios)
+
+```sql
+INSERT INTO tab_conceptos VALUES(6, 'Bonificación por chismoso',         TRUE,   'M',    FALSE,  0,      100000, FALSE);
+INSERT INTO tab_conceptos VALUES(7, 'Horas Extras Diurnas',              TRUE,   'Q',    FALSE,  25,     0,      FALSE);
+INSERT INTO tab_conceptos VALUES(8, 'Horas Extras Nocturna',             TRUE,   'Q',    FALSE,  75,     0,      FALSE);
+INSERT INTO tab_conceptos VALUES(9, 'Horas Extras Festivas Diurnas',     TRUE,   'Q',    FALSE,  100,    0,      FALSE);
+INSERT INTO tab_conceptos VALUES(10,'Horas Extras Fetivas Nocturnas',    TRUE,   'Q',    FALSE,  150,    0,      FALSE);
+```
+
+### Optional Deductions
+
+```sql
+INSERT INTO tab_conceptos VALUES(11,'Descuento por Préstamo',            FALSE,  'M',    FALSE,  10,     0,      FALSE);
+```
+
+## Concept Types
+
+### By Operation
+| Type | ind_operacion | Description |
+|------|--------------|-------------|
+| Devengado (Earning) | TRUE | Adds to total salary |
+| Deducción (Deduction) | FALSE | Subtracts from salary |
+
+### By Payment Period
+| Period | ind_perio_pago | Frequency |
+|--------|---------------|------------|
+| Quincenal | Q | Bi-weekly (every 15 days) |
+| Mensual | M | Monthly |
+
+### By Legal Status
+| Status | ind_legal | Description |
+|--------|----------|-------------|
+| Obligatorio | TRUE | Required by Colombian labor law |
+| No Obligatorio | FALSE | Optional company benefit |
+
+## Colombian Overtime Rates
+
+The system includes standard Colombian overtime percentages:
+
+| Concept | Percentage | Description |
+|---------|-----------|-------------|
+| Horas Extras Diurnas | 25% | Daytime overtime |
+| Horas Extras Nocturna | 75% | Nighttime overtime |
+| Horas Extras Festivas Diurnas | 100% | Holiday daytime overtime |
+| Horas Extras Festivas Nocturnas | 150% | Holiday nighttime overtime |
+
+## Usage Examples
+
+### Query All Earnings
+
+```sql
+SELECT id_concepto, nom_concepto, val_porcent, val_fijo
+FROM tab_conceptos
+WHERE ind_operacion = TRUE
+ORDER BY ind_legal DESC, nom_concepto;
+```
+
+### Query Mandatory Monthly Concepts
+
+```sql
+SELECT id_concepto, nom_concepto, val_porcent
+FROM tab_conceptos
+WHERE ind_legal = TRUE AND ind_perio_pago = 'M';
+```
+
+### Query Percentage-Based Concepts
+
+```sql
+SELECT id_concepto, nom_concepto, val_porcent
+FROM tab_conceptos
+WHERE val_porcent > 0
+ORDER BY val_porcent;
+```
+
+## Related Tables
+
+- **tab_pmtros**: References concepts for salary (id_concep_sb) and transport (id_concep_at)
+- **tab_novedades**: Links concepts to employee novelties
+- **tab_nomina**: Links concepts to final payroll calculations
+
+## Notes
+
+<Note>
+  The EPS and AFP deductions (4% each) are mandatory monthly contributions required by Colombian labor law.
+</Note>
+
+<Info>
+  Overtime percentages are calculated as additional payment on top of the base hourly rate. For example, 25% overtime means the worker receives 125% of their normal hourly rate.
+</Info>

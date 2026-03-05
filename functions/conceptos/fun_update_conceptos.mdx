@@ -1,0 +1,100 @@
+---
+title: 'fun_update_conceptos'
+description: 'Update an existing payroll concept'
+---
+
+## Overview
+
+Updates all fields of an existing payroll concept in `tab_conceptos`.
+
+## Signature
+
+```sql
+fun_update_conceptos(
+    wid_concepto INTEGER,
+    new_nom_concepto VARCHAR,
+    new_ind_operacion BOOLEAN,
+    new_ind_perio_pago CHAR(1),
+    new_neto_pagado BOOLEAN,
+    new_val_porcent NUMERIC,
+    new_val_fijo NUMERIC,
+    new_ind_legal BOOLEAN
+) RETURNS BOOLEAN
+```
+
+## Parameters
+
+<ParamField path="wid_concepto" type="INTEGER" required>
+  Concept ID to update
+</ParamField>
+
+<ParamField path="new_nom_concepto" type="VARCHAR" required>
+  New concept name (minimum 5 characters)
+</ParamField>
+
+<ParamField path="new_ind_operacion" type="BOOLEAN" required>
+  New operation indicator
+</ParamField>
+
+<ParamField path="new_ind_perio_pago" type="CHAR(1)" required>
+  New payment period: 'Q' or 'M'
+</ParamField>
+
+<ParamField path="new_neto_pagado" type="BOOLEAN" required>
+  New net payment indicator
+</ParamField>
+
+<ParamField path="new_val_porcent" type="NUMERIC" required>
+  New percentage value
+</ParamField>
+
+<ParamField path="new_val_fijo" type="NUMERIC" required>
+  New fixed value
+</ParamField>
+
+<ParamField path="new_ind_legal" type="BOOLEAN" required>
+  New legal indicator
+</ParamField>
+
+## Returns
+
+- `TRUE` - Concept updated successfully
+- `FALSE` - Update failed
+
+## Example Usage
+
+```sql
+-- Update a concept
+SELECT fun_update_conceptos(
+    2,
+    'nombre cambiado del concepto 2',
+    FALSE,
+    'Q',
+    TRUE,
+    0,
+    1067625,
+    TRUE
+);
+```
+
+## Validation Rules
+
+- Concept ID must exist
+- Concept name must be at least 5 characters
+- Payment period must be 'Q' or 'M'
+- Percentage value must be between 0 and 100
+
+## Error Handling
+
+| SQL State | Description |
+|-----------|-------------|
+| 23503 | Foreign key does not exist |
+| 23505 | Unique constraint violation |
+| 23514 | Value violates table constraints |
+| 22001 | Value exceeds allowed length |
+| 22P02 | Invalid data type |
+| others | Unknown error |
+
+## Source
+
+`source/func/conceptos/fun_update_conceptos.sql`
