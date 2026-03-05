@@ -1,0 +1,114 @@
+---
+title: 'fun_errcode'
+description: 'Retrieve error description by error code'
+icon: 'circle-exclamation'
+---
+
+## Overview
+
+The `fun_errcode` function retrieves the human-readable error description for a given PostgreSQL SQLSTATE error code from the `tab_error` catalog table.
+
+## Function Signature
+
+```sql
+CREATE OR REPLACE FUNCTION fun_errcode(
+    wcod_error VARCHAR
+) RETURNS VARCHAR
+```
+
+## Parameters
+
+<ParamField path="wcod_error" type="VARCHAR" required>
+  The PostgreSQL SQLSTATE error code to lookup (e.g., '23505', '22008', 'P0001')
+</ParamField>
+
+## Return Value
+
+Returns a `VARCHAR` containing the descriptive error message in Spanish, or `NULL` if the error code is not found in the catalog.
+
+## Description
+
+This utility function looks up error codes in the `tab_error` table and returns the corresponding `name_error` description. It's useful for:
+- Displaying user-friendly error messages in application interfaces
+- Logging detailed error information
+- Creating custom error handling workflows
+- Debugging database operations
+
+The function performs a simple lookup against the error catalog which contains 336+ PostgreSQL error codes organized by class (constraint violations, data exceptions, PL/pgSQL errors, etc.).
+
+## Usage Examples
+
+### Basic Error Code Lookup
+
+```sql
+-- Look up a unique constraint violation error
+SELECT fun_errcode('23505');
+-- Returns: 'Unique Violation: Violación de restricción única.'
+```
+
+### Using in Error Handling
+
+```sql
+-- Example error handler that uses fun_errcode
+DO $$
+BEGIN
+    INSERT INTO tab_emplea VALUES (1, 'Juan', 'Pérez', ...);
+EXCEPTION
+    WHEN SQLSTATE '23505' THEN
+        RAISE NOTICE 'Error: %', fun_errcode('23505');
+        -- Output: Error: Unique Violation: Violación de restricción única.
+END;
+$$;
+```
+
+### Application Integration
+
+```sql
+-- Retrieve error details for logging
+SELECT 
+    '23503' as error_code,
+    fun_errcode('23503') as error_message;
+
+-- Result:
+-- error_code | error_message
+-- 23503      | Foreign Key Violation: Violación de clave foránea.
+```
+
+### Common Error Codes
+
+```sql
+-- Check common payroll-related errors
+SELECT fun_errcode('22008');  -- Datetime Field Overflow
+SELECT fun_errcode('23502');  -- Not Null Violation
+SELECT fun_errcode('23503');  -- Foreign Key Violation
+SELECT fun_errcode('P0001');  -- Raise Exception (custom errors)
+```
+
+## Error Handling
+
+The function returns `NULL` if the provided error code does not exist in the `tab_error` table:
+
+```sql
+SELECT fun_errcode('99999');  -- Returns NULL (code doesn't exist)
+```
+
+## Performance Considerations
+
+- The function performs a simple indexed lookup on `tab_error.cod_error` (primary key)
+- Very fast execution due to primary key index
+- Safe to call frequently in application code
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Error Handling Guide" icon="triangle-exclamation" href="/guides/error-handling">
+    Complete error handling patterns and best practices
+  </Card>
+  <Card title="Error Catalog Schema" icon="database" href="/schema/error">
+    Full reference of the tab_error table structure
+  </Card>
+</CardGroup>
+
+## Source File
+
+This function is defined in `/err/fun_errcode.sql`.

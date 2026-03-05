@@ -119,6 +119,12 @@
             "pages": [
               "functions/nomina/fun_delete_nomina"
             ]
+          },
+          {
+            "group": "Error Utility Functions",
+            "pages": [
+              "functions/error/fun_errcode"
+            ]
           }
         ]
       }
